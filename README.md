@@ -6,6 +6,8 @@ harici varlık (asset) dosyası yoktur.
 
 > At → Bekle & Sars → Çek → Yakala. Balık sat, olta yükselt, adaları keşfet, ansiklopediyi doldur.
 
+**▶ Oyna: https://rodinyamert48.github.io/Fisch/**
+
 ## Hızlı başlangıç
 
 ```bash
@@ -17,6 +19,11 @@ npm test           # oyun mantığı birim testleri (vitest)
 ```
 
 WebGL2 destekli modern bir tarayıcı gerekir. İlerleme `localStorage`'a otomatik kaydedilir.
+
+### Yayınlama (GitHub Pages)
+`.github/workflows/pages.yml` her push'ta testleri çalıştırır, oyunu derler ve `dist/` klasörünü `gh-pages` dalına yayınlar.
+Site, depo ayarlarında **Settings → Pages → Source: Deploy from a branch → `gh-pages` / `(root)`** seçiliyken
+`https://rodinyamert48.github.io/Fisch/` adresinde yayında olur. Vite `base: './'` kullandığı için alt dizinde sorunsuz çalışır.
 
 ## Kontroller
 
