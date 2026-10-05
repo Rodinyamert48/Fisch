@@ -1,0 +1,23 @@
+{
+  "name": "fisch-web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Fisch tarzı web tabanlı 3D balıkçılık oyunu (TypeScript + Vite + Babylon.js)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@babylonjs/core": "8.56.2",
+    "@babylonjs/materials": "8.56.2"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^3.2.7"
+  }
+}
