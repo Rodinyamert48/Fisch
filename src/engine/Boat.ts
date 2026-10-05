@@ -27,7 +27,7 @@ function buildHull(g: GeometryBuilder, color: string, w: number, h: number, l: n
 }
 
 function buildBoatMesh(def: BoatDef, scene: Scene): { mesh: Mesh; shape: BoatShape } {
-  const g = new GeometryBuilder();
+  const g = new GeometryBuilder({ smooth: true, uvScale: 0.6 });
   const c = def.color;
   let shape: BoatShape;
   switch (def.id) {
@@ -65,7 +65,7 @@ function buildBoatMesh(def: BoatDef, scene: Scene): { mesh: Mesh; shape: BoatSha
       break;
     }
     default: {
-      // Kano
+      // Kayık
       buildHull(g, c, 1.1, 0.55, 4.4, 0.15);
       g.box('#8a5a32', { pos: [0, 0.35, -0.6], size: [1.0, 0.1, 0.5] });
       g.cylinder('#6a4a2a', { top: 0.06, bottom: 0.06, height: 2.4, tess: 4 }, { pos: [0.45, 0.5, -0.4], rot: [0.3, 0, 1.2] });
@@ -107,7 +107,7 @@ export class Boat {
     const built = buildBoatMesh(def, scene);
     this.mesh = built.mesh;
     this.shape = built.shape;
-    this.mesh.material = mats.vertexColor;
+    this.mesh.material = def.id === 'kayik' ? mats.wood : mats.wall;
     this.mesh.parent = this.root;
     this.seat = new TransformNode('seat', scene);
     this.seat.parent = this.root;

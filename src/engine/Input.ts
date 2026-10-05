@@ -10,6 +10,11 @@ export class Input {
   onKeyDown: ((code: string, e: KeyboardEvent) => void) | null = null;
   /** UI bir paneli açıkken oyun girişlerini engeller. */
   blocked = () => false;
+  /** Dokunmatikte ekranın herhangi bir yerine basmak "basılı tut" sayılsın mı? (ör. çekme sırasında) */
+  touchHold = () => false;
+  /** Birden çok basılı tutma kaynağı (fare, eylem butonu, parmaklar). */
+  private holders = new Set<string>();
+  private touchIds = new Set<number>();
 
   constructor(canvas: HTMLCanvasElement) {
     this.isTouch = window.matchMedia?.('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -17,11 +22,16 @@ export class Input {
       if (e.pointerType === 'mouse' && e.button === 0) {
         e.preventDefault();
         this.setPrimary(true);
+      } else if (e.pointerType !== 'mouse' && this.touchHold()) {
+        this.touchIds.add(e.pointerId);
+        this.hold(`touch-${e.pointerId}`, true);
       }
     });
     window.addEventListener('pointerup', (e) => {
       if (e.pointerType === 'mouse' && e.button === 0) this.setPrimary(false);
+      this.releaseTouch(e.pointerId);
     });
+    window.addEventListener('pointercancel', (e) => this.releaseTouch(e.pointerId));
     window.addEventListener('keydown', (e) => {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
@@ -34,11 +44,38 @@ export class Input {
     });
     window.addEventListener('blur', () => {
       this.keys.clear();
-      this.setPrimary(false);
+      this.holders.clear();
+      this.touchIds.clear();
+      this.update();
     });
   }
 
+  private releaseTouch(id: number): void {
+    if (!this.touchIds.delete(id)) return;
+    this.hold(`touch-${id}`, false);
+  }
+
+  /** Bir kaynağın basılı tutma durumunu ayarlar. */
+  hold(source: string, v: boolean): void {
+    if (v) this.holders.add(source);
+    else this.holders.delete(source);
+    this.update();
+  }
+
+  /** Ana (fare/klavye) kaynağı. */
   setPrimary(v: boolean): void {
+    this.hold('main', v);
+  }
+
+  /** Tüm basılı tutmaları bırak (panel açılınca vb.). */
+  releaseAll(): void {
+    this.holders.clear();
+    this.touchIds.clear();
+    this.update();
+  }
+
+  private update(): void {
+    const v = this.holders.size > 0;
     if (v === this.primaryHeld) return;
     this.primaryHeld = v;
     if (v) this.onPrimaryDown?.();

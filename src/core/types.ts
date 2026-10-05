@@ -10,22 +10,22 @@ export type RarityId =
   | 'secret'
   | 'divine';
 
-export type RegionId = 'moosewood' | 'roslit' | 'snowcap' | 'ocean' | 'deep';
+export type RegionId = 'camlikoy' | 'kizilkaya' | 'ayazburun' | 'acikdeniz' | 'abis';
 export type WeatherId = 'clear' | 'rain' | 'fog' | 'aurora';
 export type SeasonId = 'spring' | 'summer' | 'autumn' | 'winter';
 export type TimeOfDay = 'day' | 'night';
 
 export type VariantId =
   | 'none'
-  | 'shiny'
-  | 'sparkling'
-  | 'albino'
-  | 'golden'
-  | 'ghastly'
-  | 'celestial'
-  | 'nuclear'
-  | 'sunken'
-  | 'prismize';
+  | 'sedef'
+  | 'yildizli'
+  | 'karbeyaz'
+  | 'yaldiz'
+  | 'ruhani'
+  | 'takimyildiz'
+  | 'fosfor'
+  | 'kabuklu'
+  | 'tayf';
 
 export type FishShape =
   | 'standard'
@@ -103,7 +103,7 @@ export interface VariantDef {
   description: string;
 }
 
-export type RodPassive = 'none' | 'steady' | 'champion' | 'sunken' | 'storm' | 'heaven' | 'prism';
+export type RodPassive = 'none' | 'agir' | 'usta' | 'kabuk' | 'poyraz' | 'yildiz' | 'tayf';
 
 export interface RodDef {
   id: string;

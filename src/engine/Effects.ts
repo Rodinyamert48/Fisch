@@ -162,7 +162,7 @@ export class Effects {
     });
   }
 
-  /** Mükemmel yakalama / seviye atlama için konfeti patlaması. */
+  /** Kusursuz yakalama / seviye atlama için konfeti patlaması. */
   confetti(pos: Vector3, colors: string[] = ['#ffd23f', '#ff5a8a', '#4ae0ff', '#7aff6a']): void {
     for (const c of colors) {
       const col = hex(c);

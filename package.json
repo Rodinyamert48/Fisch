@@ -1,8 +1,8 @@
 {
-  "name": "fisch-web",
+  "name": "olta-efsanesi",
   "private": true,
   "version": "0.1.0",
-  "description": "Fisch tarzı web tabanlı 3D balıkçılık oyunu (TypeScript + Vite + Babylon.js)",
+  "description": "Olta Efsanesi: tarayıcıda 3D balıkçılık oyunu (TypeScript + Vite + Babylon.js)",
   "type": "module",
   "scripts": {
     "dev": "vite",

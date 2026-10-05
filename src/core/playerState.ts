@@ -1,8 +1,10 @@
 import { BAITS_BY_ID } from './data/baits';
-import { BOATS_BY_ID } from './data/boats';
-import { getFish } from './data/fish';
+import { BOATS_BY_ID, LEGACY_BOAT_IDS } from './data/boats';
+import { FISH_BY_ID, LEGACY_FISH_IDS, getFish } from './data/fish';
 import { QUESTS_BY_ID } from './data/quests';
-import { RODS_BY_ID, getRod } from './data/rods';
+import { LEGACY_ROD_IDS, RODS_BY_ID, getRod } from './data/rods';
+import { LEGACY_VARIANT_IDS, VARIANTS } from './data/variants';
+import { LEGACY_REGION_IDS } from './data/world';
 import { REGION_REWARDS, bestiaryCompletion, regionProgress, type Bestiary } from './bestiary';
 import { levelFromXp, levelLuckBonus } from './economy';
 import type { EnvSnapshot } from './environment';
@@ -10,13 +12,16 @@ import { Emitter } from './events';
 import { applyCatchToQuests, questStatus, type QuestLog } from './quests';
 import type { BaitDef, BoatDef, CaughtFish, QuestDef, RegionId, RodDef, VariantId } from './types';
 
-export const SAVE_KEY = 'fisch-web-save-v1';
+export const SAVE_KEY = 'olta-efsanesi-save-v1';
+/** Önceki sürümün kayıt anahtarı (otomatik taşınır). */
+export const LEGACY_SAVE_KEY = 'fisch-web-save-v1';
 
 export interface Settings {
   volume: number;
   music: number;
   muted: boolean;
   quality: 'auto' | 'low' | 'high';
+  haptics: boolean;
 }
 
 export interface Stats {
@@ -55,8 +60,8 @@ export function newSave(): SaveData {
     version: 1,
     cash: 0,
     xp: 0,
-    ownedRods: ['training'],
-    equippedRod: 'training',
+    ownedRods: ['acemi'],
+    equippedRod: 'acemi',
     baits: {},
     equippedBait: null,
     ownedBoats: [],
@@ -66,7 +71,7 @@ export function newSave(): SaveData {
     quests: {},
     regionRewards: [],
     stats: { totalCaught: 0, perfectCatches: 0, totalEarned: 0, casts: 0, escaped: 0 },
-    settings: { volume: 0.8, music: 0.6, muted: false, quality: 'auto' },
+    settings: { volume: 0.8, music: 0.6, muted: false, quality: 'auto', haptics: true },
     tutorialDone: false,
   };
 }
@@ -178,8 +183,8 @@ export class PlayerState {
     if (this.data.ownedRods.includes(id)) return { ok: false, reason: 'Zaten sahipsin' };
     if (this.level < rod.requiredLevel) return { ok: false, reason: `Seviye ${rod.requiredLevel} gerekli` };
     if (this.completion < rod.requiredBestiary)
-      return { ok: false, reason: `Ansiklopedi %${Math.round(rod.requiredBestiary * 100)} gerekli` };
-    if (this.data.cash < rod.price) return { ok: false, reason: 'Yetersiz C$' };
+      return { ok: false, reason: `Balık Atlası %${Math.round(rod.requiredBestiary * 100)} gerekli` };
+    if (this.data.cash < rod.price) return { ok: false, reason: 'Yetersiz akçe' };
     return { ok: true };
   }
 
@@ -206,7 +211,7 @@ export class PlayerState {
     const b = BAITS_BY_ID[id];
     if (!b) return { ok: false, reason: 'Bilinmeyen yem' };
     const cost = b.packPrice * packs;
-    if (!this.spend(cost)) return { ok: false, reason: 'Yetersiz C$' };
+    if (!this.spend(cost)) return { ok: false, reason: 'Yetersiz akçe' };
     this.addBait(id, b.packSize * packs);
     if (!this.data.equippedBait) this.data.equippedBait = id;
     this.events.emit('baits', this.data.baits);
@@ -243,7 +248,7 @@ export class PlayerState {
     if (!b) return { ok: false, reason: 'Bilinmeyen tekne' };
     if (this.data.ownedBoats.includes(id)) return { ok: false, reason: 'Zaten sahipsin' };
     if (this.level < b.requiredLevel) return { ok: false, reason: `Seviye ${b.requiredLevel} gerekli` };
-    if (!this.spend(b.price)) return { ok: false, reason: 'Yetersiz C$' };
+    if (!this.spend(b.price)) return { ok: false, reason: 'Yetersiz akçe' };
     this.data.ownedBoats.push(id);
     this.data.selectedBoat = id;
     this.events.emit('boats', this.data.ownedBoats);
@@ -348,7 +353,7 @@ export class PlayerState {
     this.events.emit('questCompleted', q);
   }
 
-  // ───────── Ansiklopedi ödülleri ─────────
+  // ───────── Balık Atlası ödülleri ─────────
   canClaimRegion(region: RegionId): boolean {
     return !this.data.regionRewards.includes(region) && regionProgress(this.data.bestiary, region).complete;
   }
@@ -381,25 +386,40 @@ function migrate(raw: Partial<SaveData>): SaveData {
     stats: { ...base.stats, ...(raw.stats ?? {}) },
     settings: { ...base.settings, ...(raw.settings ?? {}) },
   } as SaveData;
-  if (!Array.isArray(d.ownedRods) || d.ownedRods.length === 0) d.ownedRods = ['training'];
-  d.ownedRods = d.ownedRods.filter((r) => RODS_BY_ID[r]);
-  if (!d.ownedRods.includes('training')) d.ownedRods.unshift('training');
+  // Eski kimlikleri yenilerine çevir (önceki sürüm kayıtları)
+  const rod = (id: string) => LEGACY_ROD_IDS[id] ?? id;
+  const fishId = (id: string) => LEGACY_FISH_IDS[id] ?? id;
+  const variant = (id: string) => (LEGACY_VARIANT_IDS[id] ?? id) as VariantId;
+  const region = (id: string) => (LEGACY_REGION_IDS[id] ?? id) as RegionId;
+  const boat = (id: string) => LEGACY_BOAT_IDS[id] ?? id;
+
+  if (!Array.isArray(d.ownedRods) || d.ownedRods.length === 0) d.ownedRods = ['acemi'];
+  d.ownedRods = [...new Set(d.ownedRods.map(rod))].filter((r) => RODS_BY_ID[r]);
+  if (!d.ownedRods.includes('acemi')) d.ownedRods.unshift('acemi');
+  d.equippedRod = rod(d.equippedRod);
   if (!d.ownedRods.includes(d.equippedRod)) d.equippedRod = d.ownedRods[0];
-  d.inventory = (d.inventory ?? []).filter((f) => {
-    try {
-      getFish(f.fishId);
-      return true;
-    } catch {
-      return false;
-    }
-  });
-  d.ownedBoats = (d.ownedBoats ?? []).filter((b) => BOATS_BY_ID[b]);
+
+  d.inventory = (d.inventory ?? [])
+    .map((f) => ({ ...f, fishId: fishId(f.fishId), variant: variant(f.variant), region: region(f.region) }))
+    .filter((f) => FISH_BY_ID[f.fishId] && VARIANTS[f.variant]);
+  const bestiary: Bestiary = {};
+  for (const [id, e] of Object.entries(d.bestiary ?? {})) {
+    const nid = fishId(id);
+    if (!FISH_BY_ID[nid]) continue;
+    bestiary[nid] = { ...e, variants: e.variants.map(variant).filter((v) => VARIANTS[v]) };
+  }
+  d.bestiary = bestiary;
+  d.regionRewards = [...new Set((d.regionRewards ?? []).map(region))];
+  if (d.stats.biggest) d.stats.biggest.fishId = fishId(d.stats.biggest.fishId);
+  d.ownedBoats = [...new Set((d.ownedBoats ?? []).map(boat))].filter((b) => BOATS_BY_ID[b]);
+  if (d.selectedBoat) d.selectedBoat = boat(d.selectedBoat);
+  if (d.selectedBoat && !d.ownedBoats.includes(d.selectedBoat)) d.selectedBoat = d.ownedBoats[0] ?? null;
   return d;
 }
 
 export function loadFromStorage(): PlayerState {
   try {
-    const json = localStorage.getItem(SAVE_KEY);
+    const json = localStorage.getItem(SAVE_KEY) ?? localStorage.getItem(LEGACY_SAVE_KEY);
     if (json) return PlayerState.deserialize(json);
   } catch (e) {
     console.warn('Kayıt yüklenemedi, yeni oyun başlatılıyor.', e);
@@ -419,6 +439,7 @@ export function saveToStorage(state: PlayerState): boolean {
 export function clearStorage(): void {
   try {
     localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(LEGACY_SAVE_KEY);
   } catch {
     /* yok say */
   }

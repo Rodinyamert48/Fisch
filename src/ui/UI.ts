@@ -19,6 +19,7 @@ import { button, clear, el, fishSvg } from './dom';
 
 export interface UIActions {
   summonBoat(): void;
+  toggleFullscreen(): void;
   interact(): void;
   jump(): void;
   resetSave(): void;
@@ -80,6 +81,7 @@ export class UI {
   private panelEvents: (keyof StateEvents)[] = [];
   private catchDismiss: (() => void) | null = null;
   readonly actionBtn: HTMLButtonElement | null = null;
+  private fsBtn: HTMLButtonElement | null = null;
 
   constructor(
     private readonly root: HTMLElement,
@@ -104,7 +106,7 @@ export class UI {
     // Sağ üst
     const tr = el('div', 'hud-tr', null, root);
     this.envEl = el('div', 'pill env', '', tr);
-    this.nukeEl = el('div', 'nuke-badge', '☢️ NÜKLEER OLAY', tr);
+    this.nukeEl = el('div', 'nuke-badge', '🟢 YEŞİL ŞAFAK', tr);
     this.minimap = el('canvas', null, null, tr);
     this.minimap.id = 'minimap';
     this.minimap.width = 336;
@@ -116,19 +118,21 @@ export class UI {
     const bottom = el('div', 'hud-bottom', null, root);
     const menu = (icon: string, label: string, key: string, fn: () => void) => {
       const b = el('button', 'menu-btn interactive', null, bottom);
-      b.innerHTML = `<span>${icon}</span><span class="label">${label}</span><span class="key">${key}</span>`;
+      b.innerHTML = `<span class="ic">${icon}</span><span class="label">${label}</span><span class="key">${key}</span>`;
       b.addEventListener('click', (e) => {
         e.stopPropagation();
         this.audio.click();
         fn();
       });
+      return b;
     };
     menu('🎒', 'Envanter', 'I', () => this.openInventory());
-    menu('📖', 'Ansiklopedi', 'K', () => this.openBestiary());
+    menu('📖', 'Atlas', 'K', () => this.openBestiary());
     menu('📜', 'Görevler', 'J', () => this.openQuests());
     menu('⛵', 'Tekne', 'T', () => this.actions.summonBoat());
     menu('⚙️', 'Ayarlar', 'O', () => this.openSettings());
     menu('❔', 'Yardım', 'H', () => this.openHelp());
+    this.fsBtn = menu('⛶', 'Tam Ekran', 'U', () => this.actions.toggleFullscreen());
 
     this.promptEl = el('div', 'prompt', '', root);
     this.hintEl = el('div', 'hint', '', root);
@@ -191,7 +195,7 @@ export class UI {
   // ═════════════ HUD ═════════════
   refreshHud(): void {
     const s = this.state;
-    this.cashEl.textContent = `💰 ${formatCash(s.cash)}`;
+    this.cashEl.textContent = `🪙 ${formatCash(s.cash)}`;
     const li = s.levelInfo;
     this.levelEl.textContent = `⭐ Seviye ${li.level}`;
     this.xpText.textContent = `${li.into}/${li.needed} XP`;
@@ -206,6 +210,15 @@ export class UI {
     this.nukeEl.style.display = info.nuke ? 'block' : 'none';
   }
 
+  setFullscreenState(on: boolean, supported: boolean): void {
+    if (!this.fsBtn) return;
+    this.fsBtn.style.display = supported ? '' : 'none';
+    const ic = this.fsBtn.querySelector('.ic');
+    const lb = this.fsBtn.querySelector('.label');
+    if (ic) ic.textContent = on ? '🗗' : '⛶';
+    if (lb) lb.textContent = on ? 'Pencere' : 'Tam Ekran';
+  }
+
   showZoneBanner(title: string, subtitle: string): void {
     this.bannerEl.innerHTML = `<div class="t">${title}</div><div class="s">${subtitle}</div>`;
     this.bannerEl.classList.add('show');
@@ -213,11 +226,19 @@ export class UI {
     this.bannerTimer = window.setTimeout(() => this.bannerEl.classList.remove('show'), 3200);
   }
 
-  setPrompt(text: string | null): void {
+  private lastPrompt: string | null = null;
+
+  setPrompt(text: string | null, icon = '💬'): void {
+    if (text === this.lastPrompt) return;
+    this.lastPrompt = text;
     if (text) {
-      this.promptEl.innerHTML = this.isTouch ? text.replace(/\[E\]/, '👆') : text.replace(/\[E\]/, '<span class="key">E</span>');
+      this.promptEl.innerHTML = this.isTouch ? text.replace(/\[E\] ?/, '') : text.replace(/\[E\]/, '<span class="key">E</span>');
       this.promptEl.style.display = 'block';
     } else this.promptEl.style.display = 'none';
+    if (this.interactBtn) {
+      this.interactBtn.classList.toggle('show', !!text);
+      this.interactBtn.textContent = icon;
+    }
   }
 
   setHint(text: string | null): void {
@@ -257,7 +278,7 @@ export class UI {
     c.fillRect(0, 0, W, W);
     // Kuzey (+z) yukarıda; x sağa
     const toMap = (x: number, z: number) => [R + (x - px) * scale, R - (z - pz) * scale] as const;
-    // Derinlikler
+    // Abis Çukuru
     {
       const [x, y] = toMap(TRENCH.cx, TRENCH.cz);
       c.fillStyle = '#0a2238';
@@ -384,8 +405,8 @@ export class UI {
     this.reelFish.style.left = `${game.fishPos * 100}%`;
     this.reelProgressFill.style.width = `${game.progress * 100}%`;
     this.reelProgress.classList.toggle('losing', !game.fishInside);
-    const hint = !game.started ? '⏳ Hazır ol...' : this.isTouch ? 'Bas → sağa · Bırak → sola' : 'Basılı tut → sağa · Bırak → sola';
-    this.reelInfo.innerHTML = `<span>${hint}</span><span class="${game.perfect ? 'perfect-on' : 'perfect-off'}">✨ Mükemmel</span>`;
+    const hint = !game.started ? '⏳ Hazır ol...' : this.isTouch ? 'Ekrana bas → sağa · Bırak → sola' : 'Basılı tut → sağa · Bırak → sola';
+    this.reelInfo.innerHTML = `<span>${hint}</span><span class="${game.perfect ? 'perfect-on' : 'perfect-off'}">✨ Kusursuz</span>`;
   }
 
   hideReel(): void {
@@ -415,7 +436,7 @@ export class UI {
       const vb = el('span', 'badge variant', `${v.name} ×${v.valueMult}`, badges);
       vb.style.background = v.color;
     }
-    if (d.caught.perfect) el('span', 'badge perfect', '✨ MÜKEMMEL YAKALAMA', badges);
+    if (d.caught.perfect) el('span', 'badge perfect', '✨ KUSURSUZ YAKALAMA', badges);
     if (o.isNewVariant) el('span', 'badge new', 'Yeni varyant!', badges);
     if (o.isRecord) el('span', 'badge new', '🏆 Yeni rekor!', badges);
 
@@ -430,7 +451,7 @@ export class UI {
       <div><small>Değer</small><b style="color:var(--gold)">${formatCash(d.caught.value)}</b></div>
       <div><small>XP</small><b style="color:#7ad8ff">+${o.xpGained}${d.caught.perfect ? ' (1.5x)' : ''}</b></div>`;
     const extra = el('div', 'catch-extra', null, info);
-    if (o.bonusCash > 0) el('div', null, `💰 Mükemmel yakalama bonusu: +${formatCash(o.bonusCash)}`, extra);
+    if (o.bonusCash > 0) el('div', null, `🪙 Kusursuz yakalama bonusu: +${formatCash(o.bonusCash)}`, extra);
     for (const q of o.questsCompleted) el('div', null, `📜 Görev tamamlandı: ${q.title} (+${formatCash(q.reward.cash)})`, extra);
     for (const l of o.levelUps) el('div', null, `⭐ Seviye ${l}!`, extra);
     button(this.isTouch ? 'Devam' : 'Devam (Space)', 'green', onDismiss, info);
@@ -589,13 +610,13 @@ export class UI {
             }
           }, row);
           if (!check.ok) {
-            b.disabled = check.reason !== 'Yetersiz C$';
+            b.disabled = check.reason !== 'Yetersiz akçe';
             el('div', 'req', check.reason, card);
           }
         }
         const reqs: string[] = [];
         if (rod.requiredLevel > 0) reqs.push(`Seviye ${rod.requiredLevel}`);
-        if (rod.requiredBestiary > 0) reqs.push(`Ansiklopedi %${Math.round(rod.requiredBestiary * 100)} (şu an %${Math.round(this.state.completion * 100)})`);
+        if (rod.requiredBestiary > 0) reqs.push(`Balık Atlası %${Math.round(rod.requiredBestiary * 100)} (şu an %${Math.round(this.state.completion * 100)})`);
         if (reqs.length && !owned) el('div', 'sub', `Şartlar: ${reqs.join(' · ')}`, card);
       }
       const others = RODS.filter((r) => r.soldAt && r.soldAt !== island.id && !this.state.data.ownedRods.includes(r.id));
@@ -679,7 +700,7 @@ export class UI {
     const card = el('div', `card quest-card${st === 'done' ? ' done' : ''}`, null, parent);
     el('h3', null, `${st === 'done' ? '✅ ' : ''}${q.title}`, card);
     el('div', 'sub', q.description, card);
-    const rw = [`💰 ${formatCash(q.reward.cash)}`, `⭐ ${q.reward.xp} XP`];
+    const rw = [`🪙 ${formatCash(q.reward.cash)}`, `⭐ ${q.reward.xp} XP`];
     if (q.reward.bait) rw.push(`🪱 ${BAITS_BY_ID[q.reward.bait.id].name} ×${q.reward.bait.amount}`);
     el('div', 'passive', `Ödül: ${rw.join(' · ')}`, card);
     if (st === 'active' || st === 'done') {
@@ -761,7 +782,7 @@ export class UI {
       } else {
         const grid = el('div', 'grid', null, body);
         const owned = BOATS.filter((b) => this.state.data.ownedBoats.includes(b.id));
-        if (owned.length === 0) el('div', 'empty', 'Teknen yok. Tersaneden bir Kano alarak başla!', body);
+        if (owned.length === 0) el('div', 'empty', 'Teknen yok. Kayıkhaneden bir Kayık alarak başla!', body);
         for (const b of owned) {
           const selected = this.state.data.selectedBoat === b.id;
           const card = el('div', `card owned${selected ? ' equipped' : ''}`, null, grid);
@@ -774,9 +795,9 @@ export class UI {
     }, ['inventory', 'rods', 'baits', 'boats']);
   }
 
-  openBestiary(region: RegionId | 'trash' = 'moosewood'): void {
+  openBestiary(region: RegionId | 'trash' = 'camlikoy'): void {
     let current: RegionId | 'trash' = region;
-    this.openPanel('📖 Ansiklopedi', (body) => {
+    this.openPanel('📖 Balık Atlası', (body) => {
       const comp = this.state.completion;
       const c = el('div', 'completion', null, body);
       el('b', null, `Toplam tamamlanma: %${Math.round(comp * 100)}`, c);
@@ -903,6 +924,18 @@ export class UI {
         this.actions.settingsChanged();
         this.panelRender?.();
       }, mute);
+      const fs = el('div', 'settings-row', null, body);
+      el('span', null, '⛶ Tam ekran (U)', fs);
+      button('Aç / Kapat', 'ghost', () => this.actions.toggleFullscreen(), fs);
+      if (this.isTouch) {
+        const hp = el('div', 'settings-row', null, body);
+        el('span', null, '📳 Titreşim', hp);
+        button(s.haptics ? 'Açık' : 'Kapalı', s.haptics ? 'green' : 'ghost', () => {
+          s.haptics = !s.haptics;
+          this.actions.settingsChanged();
+          this.panelRender?.();
+        }, hp);
+      }
       const q = el('div', 'settings-row', null, body);
       el('span', null, '🖥️ Grafik kalitesi (yeniden yükleme gerekir)', q);
       const sel = el('select', null, null, q);
@@ -919,7 +952,7 @@ export class UI {
       const stats = el('div', 'npc-line', null, body);
       stats.style.marginTop = '14px';
       const big = st.biggest ? `${FISH_BY_ID[st.biggest.fishId]?.name} (${formatWeight(st.biggest.weight)})` : '-';
-      stats.innerHTML = `<b>İstatistikler</b><br>Toplam yakalanan: ${st.totalCaught} · Mükemmel: ${st.perfectCatches} · Kaçan: ${st.escaped} · Atış: ${st.casts}<br>Toplam kazanç: ${formatCash(st.totalEarned)} · En büyük: ${big}`;
+      stats.innerHTML = `<b>İstatistikler</b><br>Toplam yakalanan: ${st.totalCaught} · Kusursuz: ${st.perfectCatches} · Kaçan: ${st.escaped} · Atış: ${st.casts}<br>Toplam kazanç: ${formatCash(st.totalEarned)} · En büyük: ${big}`;
       const reset = el('div', 'settings-row', null, body);
       el('span', null, '🗑️ Kaydı sıfırla', reset);
       button('Sıfırla', 'red', () => {
@@ -934,13 +967,14 @@ export class UI {
       const g = el('div', 'help-grid', null, body);
       const rows: [string, string][] = this.isTouch
         ? [
-            ['🕹️', 'Sol alttaki joystick ile yürü (sonuna kadar it: koş)'],
+            ['🕹️', 'Ekranın sol yarısına dokun ve sürükle: yürü (uzağa it: koş)'],
             ['🎣', 'Büyük butonu basılı tut → güç çubuğu dolar, yeşil alanda bırak = Mükemmel!'],
             ['SARS!', 'Beklerken beliren butonlara dokun: balık daha çabuk gelir'],
-            ['🎣', 'Çekerken: bas → çubuk sağa, bırak → sola. Balığı çubuğun içinde tut'],
-            ['👆', 'Kişilerle konuş / tekneye bin-in'],
+            ['🌀', 'Çekerken ekranın sağ yarısında HERHANGİ bir yere bas → çubuk sağa, bırak → sola'],
+            ['💬', 'Biri yakındayken beliren butonla konuş / tekneye bin-in'],
             ['⛵', 'Teknen varsa suya yakınken çağır'],
-            ['☝️', 'Ekranı sürükle: kamera · iki parmak: yakınlaştır'],
+            ['☝️', 'Sağ yarıyı sürükle: kamera · iki parmak: yakınlaştır'],
+            ['⛶', 'Üstteki düğmeyle tam ekran (iPhone: Paylaş → Ana Ekrana Ekle)'],
           ]
         : [
             ['W A S D', 'Yürü (Shift: koş) · Space: zıpla'],
@@ -950,60 +984,109 @@ export class UI {
             ['Sağ tık', 'Sürükle: kamerayı döndür · Tekerlek: yakınlaştır'],
             ['E', 'Kişilerle konuş / tekneye bin-in'],
             ['T', 'Teknen varsa suya yakınken çağır (teknede W/S gaz, A/D dümen)'],
-            ['I K J', 'Envanter · Ansiklopedi · Görevler'],
-            ['M', 'Sesi aç/kapat'],
+            ['I K J', 'Envanter · Balık Atlası · Görevler'],
+            ['M · U', 'Sesi aç/kapat · Tam ekran'],
           ];
       for (const [k, d] of rows) {
         el('span', 'key', k, g);
         el('span', null, d, g);
       }
       el('div', 'npc-line', null, body).innerHTML =
-        '<b>İpuçları:</b> Nadir balıklar daha uzun bekler ama sesleri daha belirgindir. Gece, yağmur, sis, kutup ışıkları ve mevsimler farklı balıklar getirir. Balık hiç çubuktan çıkmazsa <b>Mükemmel Yakalama</b>: 1.5x XP + ekstra C$!';
+        '<b>İpuçları:</b> Nadir balıklar daha uzun bekler ama sesleri daha belirgindir. Gece, yağmur, sis, kutup ışıkları ve mevsimler farklı balıklar getirir. Balık hiç çubuktan çıkmazsa <b>Kusursuz Yakalama</b>: 1.5x XP + ekstra akçe!';
     });
   }
 
   // ═════════════ Mobil ═════════════
+  private interactBtn: HTMLButtonElement | null = null;
+  private boatBtn: HTMLButtonElement | null = null;
+  private actionLabel: HTMLElement | null = null;
+  private actionIcon: HTMLElement | null = null;
+  private lastActionMode = '';
+
+  /**
+   * Mobil kontroller:
+   * - Sol yarıda yüzen joystick: başparmağın değdiği yerde belirir.
+   * - Büyük, duruma göre değişen eylem butonu (At / Bırak / Çek / Devam).
+   * - Yalnızca etkileşim varken görünen "Konuş/Bin" butonu, zıplama ve tekne butonları.
+   */
   private buildMobileControls(): HTMLButtonElement {
     const wrap = el('div', 'mobile', null, this.root);
-    const joy = el('div', 'joystick', null, wrap);
-    const knob = el('div', 'knob', null, joy);
+    const zone = el('div', 'joy-zone', null, wrap);
+    const base = el('div', 'joystick', null, zone);
+    const knob = el('div', 'knob', null, base);
     let active: number | null = null;
-    const setJoy = (e: PointerEvent) => {
-      const r = joy.getBoundingClientRect();
-      const cx = r.left + r.width / 2;
-      const cy = r.top + r.height / 2;
-      let dx = (e.clientX - cx) / (r.width / 2);
-      let dy = (e.clientY - cy) / (r.height / 2);
+    let cx = 0;
+    let cy = 0;
+    const R = 62;
+    const place = (x: number, y: number) => {
+      const zr = zone.getBoundingClientRect();
+      cx = x;
+      cy = y;
+      base.style.left = `${x - zr.left}px`;
+      base.style.top = `${y - zr.top}px`;
+    };
+    const move = (e: PointerEvent) => {
+      let dx = (e.clientX - cx) / R;
+      let dy = (e.clientY - cy) / R;
       const l = Math.hypot(dx, dy);
       if (l > 1) {
+        // Parmak çok uzaklaşırsa taban onu takip eder
+        cx += (dx / l) * (l - 1) * R;
+        cy += (dy / l) * (l - 1) * R;
+        place(cx, cy);
         dx /= l;
         dy /= l;
       }
-      knob.style.transform = `translate(${dx * 40}px, ${dy * 40}px)`;
+      knob.style.transform = `translate(${dx * R * 0.7}px, ${dy * R * 0.7}px)`;
       this.onJoystick?.(dx, -dy);
     };
-    joy.addEventListener('pointerdown', (e) => {
+    let holdId: number | null = null;
+    zone.addEventListener('pointerdown', (e) => {
+      // Çekme sırasında sol yarıya basmak da "basılı tut" sayılır
+      if (this.holdMode()) {
+        holdId = e.pointerId;
+        safeCapture(zone, e.pointerId);
+        this.onHold?.(`zone-${e.pointerId}`, true);
+        return;
+      }
+      if (active !== null) return;
       active = e.pointerId;
-      joy.setPointerCapture(e.pointerId);
-      setJoy(e);
+      safeCapture(zone, e.pointerId);
+      base.classList.add('active');
+      place(e.clientX, e.clientY);
+      move(e);
     });
-    joy.addEventListener('pointermove', (e) => {
-      if (e.pointerId === active) setJoy(e);
+    zone.addEventListener('pointermove', (e) => {
+      if (e.pointerId === active) move(e);
     });
     const end = (e: PointerEvent) => {
+      if (e.pointerId === holdId) {
+        holdId = null;
+        this.onHold?.(`zone-${e.pointerId}`, false);
+        return;
+      }
       if (e.pointerId !== active) return;
       active = null;
+      base.classList.remove('active');
       knob.style.transform = '';
+      base.style.left = '';
+      base.style.top = '';
       this.onJoystick?.(0, 0);
     };
-    joy.addEventListener('pointerup', end);
-    joy.addEventListener('pointercancel', end);
+    zone.addEventListener('pointerup', end);
+    zone.addEventListener('pointercancel', end);
 
-    const mk = (cls: string, text: string) => el('button', `m-btn ${cls}`, text, wrap);
-    const action = mk('m-action', '🎣');
+    const mk = (cls: string, html: string) => {
+      const b = el('button', `m-btn ${cls}`, null, wrap);
+      b.innerHTML = html;
+      return b;
+    };
+    const action = mk('m-action', '<span class="ic">🎣</span><span class="lb">AT</span>');
+    this.actionIcon = action.querySelector('.ic');
+    this.actionLabel = action.querySelector('.lb');
     action.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      action.setPointerCapture(e.pointerId);
+      safeCapture(action, e.pointerId);
       action.classList.add('held');
       this.onAction?.(true);
     });
@@ -1017,17 +1100,52 @@ export class UI {
       e.preventDefault();
       this.actions.jump();
     });
-    mk('m-interact', 'E').addEventListener('pointerdown', (e) => {
+    this.interactBtn = mk('m-interact', '💬');
+    this.interactBtn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.actions.interact();
     });
-    mk('m-boat', '⛵').addEventListener('pointerdown', (e) => {
+    this.boatBtn = mk('m-boat', '⛵');
+    this.boatBtn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.actions.summonBoat();
     });
     return action;
   }
 
+  /** Mobil eylem butonunun simgesi ve etiketi (balık tutma durumuna göre). */
+  setActionMode(mode: 'cast' | 'release' | 'wait' | 'reel' | 'continue' | 'swim'): void {
+    if (!this.actionIcon || !this.actionLabel || mode === this.lastActionMode) return;
+    this.lastActionMode = mode;
+    const map = {
+      cast: ['🎣', 'AT'],
+      release: ['🎯', 'BIRAK'],
+      wait: ['⏳', 'BEKLE'],
+      reel: ['🌀', 'ÇEK'],
+      continue: ['✔️', 'DEVAM'],
+      swim: ['🏊', 'YÜZ'],
+    } as const;
+    this.actionIcon.textContent = map[mode][0];
+    this.actionLabel.textContent = map[mode][1];
+    this.actionBtn?.classList.toggle('reeling', mode === 'reel');
+  }
+
+  /** Tekne butonunu yalnızca tekne sahibi olunca göster. */
+  setBoatAvailable(v: boolean): void {
+    if (this.boatBtn) this.boatBtn.style.display = v ? '' : 'none';
+  }
+
   onJoystick: ((x: number, y: number) => void) | null = null;
+  onHold: ((source: string, down: boolean) => void) | null = null;
+  holdMode: () => boolean = () => false;
   onAction: ((down: boolean) => void) | null = null;
+}
+
+/** Pointer yakalama bazı durumlarda (ör. sentetik olaylar) hata fırlatabilir; oyunu bozmasın. */
+function safeCapture(el: Element, id: number): void {
+  try {
+    el.setPointerCapture(id);
+  } catch {
+    /* yok say */
+  }
 }

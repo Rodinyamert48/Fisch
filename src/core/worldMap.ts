@@ -82,7 +82,7 @@ export function islandHeight(isl: IslandDef, x: number, z: number): number {
   // Kasaba düzlüğü
   const tc = townCenter(isl);
   const dt = Math.hypot(x - tc.x, z - tc.z);
-  const w = smoothstep(isl.townRadius, isl.townRadius * 0.6, dt);
+  const w = smoothstep(isl.townRadius * 1.2, isl.townRadius * 0.82, dt);
   if (w > 0) h = lerp(h, isl.townHeight, w);
   return h;
 }
@@ -97,7 +97,7 @@ export function terrainHeight(x: number, z: number): number {
     if (dx * dx + dz * dz > isl.radius * isl.radius * 4) continue;
     h = Math.max(h, islandHeight(isl, x, z));
   }
-  // Derinlikler çukuru
+  // Abis Çukuru çukuru
   const dTrench = Math.hypot(x - TRENCH.cx, z - TRENCH.cz);
   if (dTrench < TRENCH.radius) {
     h = Math.min(h, lerp(SEA_FLOOR - 40, SEA_FLOOR, smoothstep(TRENCH.radius * 0.5, TRENCH.radius, dTrench)));
@@ -172,21 +172,21 @@ export function inTrench(x: number, z: number): boolean {
 }
 
 /**
- * Balık tutma bölgesi. Derinlikler yalnızca Batiskaf ile; aksi halde çukurda Açık Deniz havuzu kullanılır.
+ * Balık tutma bölgesi. Abis Çukuru yalnızca Batiskaf ile; aksi halde çukurda Açık Deniz havuzu kullanılır.
  */
 export function regionAt(x: number, z: number, deepCapable: boolean): RegionId {
   const isl = islandAt(x, z, true);
   if (isl) return isl.id;
-  if (inTrench(x, z)) return deepCapable ? 'deep' : 'ocean';
-  return 'ocean';
+  if (inTrench(x, z)) return deepCapable ? 'abis' : 'acikdeniz';
+  return 'acikdeniz';
 }
 
 /** Konumdaki bölge adı (HUD için). */
 export function zoneNameAt(x: number, z: number): { name: string; region: RegionId | 'trench' } {
   const isl = islandAt(x, z, true);
   if (isl) return { name: isl.name, region: isl.id };
-  if (inTrench(x, z)) return { name: 'Derinlikler', region: 'trench' };
-  return { name: 'Açık Deniz', region: 'ocean' };
+  if (inTrench(x, z)) return { name: 'Abis Çukuru', region: 'trench' };
+  return { name: 'Açık Deniz', region: 'acikdeniz' };
 }
 
 /** Bir noktanın etrafında tekne için yeterince derin su arar. */

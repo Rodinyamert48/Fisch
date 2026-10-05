@@ -4,11 +4,11 @@ type Mood = RegionId | 'menu';
 
 const SCALES: Record<Mood, { root: number; scale: number[]; chords: number[][]; tempo: number; wave: OscillatorType }> = {
   // Kök frekans (Hz), yarım ton aralıkları, akor dizisi (ölçek dereceleri)
-  moosewood: { root: 261.63, scale: [0, 2, 4, 7, 9, 12, 14, 16], chords: [[0, 4, 7], [-3, 0, 4], [5, 9, 12], [7, 11, 14]], tempo: 3.2, wave: 'triangle' },
-  roslit: { root: 293.66, scale: [0, 2, 4, 6, 7, 9, 11, 12], chords: [[0, 4, 7], [2, 6, 9], [-1, 2, 7], [4, 7, 11]], tempo: 2.8, wave: 'triangle' },
-  snowcap: { root: 220, scale: [0, 3, 5, 7, 10, 12, 15, 17], chords: [[0, 3, 7], [-4, 0, 3], [-2, 2, 5], [-5, -2, 2]], tempo: 4, wave: 'sine' },
-  ocean: { root: 196, scale: [0, 2, 4, 7, 9, 12, 14, 16], chords: [[0, 4, 7], [5, 9, 12], [-3, 0, 4], [2, 5, 9]], tempo: 3.6, wave: 'sine' },
-  deep: { root: 146.83, scale: [0, 1, 5, 7, 8, 12, 13, 15], chords: [[0, 3, 7], [1, 5, 8], [-4, 0, 3], [-2, 1, 5]], tempo: 5, wave: 'sine' },
+  camlikoy: { root: 261.63, scale: [0, 2, 4, 7, 9, 12, 14, 16], chords: [[0, 4, 7], [-3, 0, 4], [5, 9, 12], [7, 11, 14]], tempo: 3.2, wave: 'triangle' },
+  kizilkaya: { root: 293.66, scale: [0, 2, 4, 6, 7, 9, 11, 12], chords: [[0, 4, 7], [2, 6, 9], [-1, 2, 7], [4, 7, 11]], tempo: 2.8, wave: 'triangle' },
+  ayazburun: { root: 220, scale: [0, 3, 5, 7, 10, 12, 15, 17], chords: [[0, 3, 7], [-4, 0, 3], [-2, 2, 5], [-5, -2, 2]], tempo: 4, wave: 'sine' },
+  acikdeniz: { root: 196, scale: [0, 2, 4, 7, 9, 12, 14, 16], chords: [[0, 4, 7], [5, 9, 12], [-3, 0, 4], [2, 5, 9]], tempo: 3.6, wave: 'sine' },
+  abis: { root: 146.83, scale: [0, 1, 5, 7, 8, 12, 13, 15], chords: [[0, 3, 7], [1, 5, 8], [-4, 0, 3], [-2, 1, 5]], tempo: 5, wave: 'sine' },
   menu: { root: 261.63, scale: [0, 2, 4, 7, 9, 12], chords: [[0, 4, 7]], tempo: 4, wave: 'sine' },
 };
 
@@ -33,7 +33,7 @@ export class AudioSystem {
   private musicTimer = 0;
   private gullTimer = 6;
   private cricketTimer = 2;
-  private mood: Mood = 'moosewood';
+  private mood: Mood = 'camlikoy';
   private chordIndex = 0;
   private fanfareUntil = 0;
   private volume = 0.8;
@@ -423,7 +423,7 @@ export class AudioSystem {
     this.chordIndex++;
     const t0 = this.now + 0.05;
     const night = this.ambState.daylight < 0.3;
-    const pad = night || this.mood === 'deep' || this.mood === 'snowcap';
+    const pad = night || this.mood === 'abis' || this.mood === 'ayazburun';
     for (const n of chord) {
       this.tone(semis(sc.root / 2, n), sc.tempo * 1.1, { type: 'sine', gain: pad ? 0.05 : 0.035, attack: 0.6, at: t0, bus: this.music });
     }

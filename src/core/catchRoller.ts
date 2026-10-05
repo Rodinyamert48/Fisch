@@ -47,7 +47,7 @@ export function totalLuck(ctx: CatchContext): number {
   let luck = ctx.rod.luck + (ctx.bait?.luck ?? 0) + ctx.bonusLuck;
   if (ctx.weather === 'fog') luck += 15;
   if (ctx.weather === 'aurora') luck += 40;
-  if (ctx.rod.passive === 'storm' && ctx.weather === 'rain') luck += 60;
+  if (ctx.rod.passive === 'poyraz' && ctx.weather === 'rain') luck += 60;
   return Math.max(0, luck);
 }
 
@@ -57,7 +57,7 @@ export function rarityWeight(rarity: RarityId, luck: number, rod?: RodDef): numb
   let factor = 1 + (luck / 100) * def.luckScale;
   factor = Math.max(0.08, factor);
   let w = def.baseWeight * factor;
-  if (rod?.passive === 'heaven' && (rarity === 'secret' || rarity === 'divine')) w *= 2;
+  if (rod?.passive === 'yildiz' && (rarity === 'secret' || rarity === 'divine')) w *= 2;
   return w;
 }
 
@@ -81,12 +81,12 @@ export function rollWeight(fish: FishDef, rng: Rng): number {
 }
 
 export function rollVariant(ctx: CatchContext, rng: Rng): VariantId {
-  if (ctx.rod.passive === 'prism' && rng() < PRISM_ROD_CHANCE) return 'prismize';
-  if (ctx.rod.passive === 'sunken' && rng() < SUNKEN_ROD_CHANCE) return 'sunken';
-  if (ctx.nukeEvent && rng() < NUCLEAR_EVENT_CHANCE) return 'nuclear';
+  if (ctx.rod.passive === 'tayf' && rng() < PRISM_ROD_CHANCE) return 'tayf';
+  if (ctx.rod.passive === 'kabuk' && rng() < SUNKEN_ROD_CHANCE) return 'kabuklu';
+  if (ctx.nukeEvent && rng() < NUCLEAR_EVENT_CHANCE) return 'fosfor';
   const boost = ctx.bait?.variantBoost ?? 1;
   for (const id of NATURAL_VARIANT_ORDER) {
-    if (id === 'ghastly' && ctx.time !== 'night') continue;
+    if (id === 'ruhani' && ctx.time !== 'night') continue;
     if (rng() < VARIANTS[id].chance * boost) return id;
   }
   return 'none';
@@ -108,7 +108,7 @@ export function rollCatch(ctx: CatchContext, rng: Rng): CatchRoll {
 export function totalLureSpeed(rod: RodDef, bait: BaitDef | null, weather: WeatherId, perfectCast: boolean): number {
   let lure = rod.lureSpeed + (bait?.lureSpeed ?? 0);
   if (weather === 'rain') lure += 20;
-  if (rod.passive === 'storm' && weather === 'rain') lure += 30;
+  if (rod.passive === 'poyraz' && weather === 'rain') lure += 30;
   if (perfectCast) lure += 20;
   return lure;
 }

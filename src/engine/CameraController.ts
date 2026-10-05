@@ -36,12 +36,13 @@ export class CameraController {
           this.dragging = true;
           this.lastX = e.clientX;
           this.lastY = e.clientY;
-          canvas.setPointerCapture(e.pointerId);
+          safeCapture(canvas, e.pointerId);
         }
       } else {
+        if (this.ignoreTouch()) return;
         this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (this.touches.size === 2) this.pinchDist = this.touchDistance();
-        canvas.setPointerCapture(e.pointerId);
+        safeCapture(canvas, e.pointerId);
       }
     });
     canvas.addEventListener('pointermove', (e) => {
@@ -120,6 +121,12 @@ export class CameraController {
     this.yaw = Math.atan2(-Math.cos(yaw), -Math.sin(yaw));
   }
 
+  /** Dokunuşlar kamera yerine oyuna aitse (ör. çekme sırasında) true. */
+  ignoreTouch: () => boolean = () => false;
+
+  /** Kamera bir binanın içine girerse yaklaşması için kontrol (Game atar). */
+  blocked: (x: number, y: number, z: number) => boolean = () => false;
+
   update(dt: number, follow: Vector3, groundAt: (x: number, z: number) => number, heightOffset = 1.7): void {
     this.idleTime += dt;
     const goal = follow.add(new Vector3(0, heightOffset, 0));
@@ -135,7 +142,7 @@ export class CameraController {
       const py = this.target.y + r * cosP;
       const pz = this.target.z + r * Math.sin(this.yaw) * sinP;
       const g = Math.max(groundAt(px, pz), 0.2);
-      if (py > g + 0.7 || r < 2.5) break;
+      if ((py > g + 0.7 && !this.blocked(px, py, pz)) || r < 2.5) break;
       r *= 0.85;
     }
     this.shake = Math.max(0, this.shake - dt * 2);
@@ -145,5 +152,14 @@ export class CameraController {
     this.camera.alpha = this.yaw;
     this.camera.beta = this.pitch;
     this.camera.radius = r;
+  }
+}
+
+/** Pointer yakalama bazı durumlarda (ör. sentetik olaylar) hata fırlatabilir; oyunu bozmasın. */
+function safeCapture(el: Element, id: number): void {
+  try {
+    el.setPointerCapture(id);
+  } catch {
+    /* yok say */
   }
 }

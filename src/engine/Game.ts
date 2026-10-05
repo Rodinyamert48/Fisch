@@ -16,10 +16,12 @@ import { findLandNear, findWaterNear, groundHeight, inTrench, islandAt, townCent
 import type { RegionId, SeasonId } from '../core/types';
 import { AudioSystem } from '../audio/AudioSystem';
 import { UI } from '../ui/UI';
+import { fullscreenSupported, isFullscreen, isIOS, isStandalone, onFullscreenChange, toggleFullscreen, vibrate } from '../ui/fullscreen';
 import { Boat } from './Boat';
 import { CameraController } from './CameraController';
 import { Effects } from './Effects';
 import { FishingController } from './FishingController';
+import { Graphics } from './Graphics';
 import { hex } from './geometry';
 import { Input } from './Input';
 import { Materials } from './materials';
@@ -28,6 +30,7 @@ import { Player } from './Player';
 import { Sky } from './Sky';
 import { Water } from './Water';
 import { WorldBuilder } from './WorldBuilder';
+import type { Texture } from '@babylonjs/core/Materials/Textures/texture';
 
 const SEASON_TINT: Record<SeasonId, string> = {
   spring: '#f4fff0',
@@ -58,6 +61,7 @@ export class Game {
   private sky: Sky;
   private water: Water;
   private glow: GlowLayer | null;
+  private gfx: Graphics;
   private sun: DirectionalLight;
   private hemi: HemisphericLight;
   private cam: CameraController;
@@ -78,6 +82,7 @@ export class Game {
   private readonly debug = new URLSearchParams(location.search).has('debug');
   readonly quality: 'low' | 'high';
   private firstCastHintShown = false;
+  private foamTime = 0;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -99,7 +104,7 @@ export class Game {
     scene.fogDensity = 0.0018;
     scene.ambientColor = new Color3(0.15, 0.15, 0.18);
 
-    this.mats = new Materials(scene);
+    this.mats = new Materials(scene, this.quality);
     this.sun = new DirectionalLight('sun', new Vector3(-0.5, -1, 0.3), scene);
     this.sun.intensity = 1.1;
     this.hemi = new HemisphericLight('hemi', new Vector3(0, 1, 0), scene);
@@ -109,7 +114,8 @@ export class Game {
     this.glow.intensity = 0.85;
 
     this.cam = new CameraController(scene, canvas);
-    this.sky = new Sky(scene);
+    this.gfx = new Graphics(this.engine, scene, this.cam.camera, this.sun, high);
+    this.sky = new Sky(scene, this.gfx.linearOutput);
     this.water = new Water(scene, 3200, high ? 512 : 256);
     this.water.addToRenderList(this.sky.mesh);
     if (!high) this.water.setRefreshRate(2);
@@ -120,6 +126,8 @@ export class Game {
     for (const m of [...world.terrain, ...world.props, world.seabed]) this.water.addToRenderList(m);
     for (const m of world.lamps) this.water.addToRenderList(m);
     for (const m of [...world.lamps, ...world.lava]) this.glow.addIncludedOnlyMesh(m);
+    this.gfx.addCasters(world.props);
+    this.gfx.addReceivers([...world.terrain, ...world.props, ...world.grass]);
 
     this.effects = new Effects(scene, this.mats, this.cam.camera, !high);
     for (const p of builder.lavaPoints) this.effects.addSmoke(p);
@@ -130,21 +138,40 @@ export class Game {
     this.player.yaw = state.data.player?.rot ?? ISLANDS[0].dockAngle;
     this.cam.snapBehind(this.player.yaw);
     for (const m of this.player.meshes) this.water.addToRenderList(m);
+    this.gfx.addCasters(this.player.meshes);
+    this.gfx.addReceivers(this.player.meshes);
     this.player.setRod(state.rod.color, state.rod.tier);
 
+    // Kamera binaların içine girmesin
+    const boxes = builder.colliders.filter((c) => c.kind === 'box');
+    this.cam.blocked = (x, y, z) =>
+      boxes.some((c) => {
+        if (c.kind !== 'box') return false;
+        const dx = x - c.x;
+        const dz = z - c.z;
+        const s = Math.sin(c.angle);
+        const co = Math.cos(c.angle);
+        return Math.abs(dx * co - dz * s) < c.hw + 0.6 && Math.abs(dx * s + dz * co) < c.hd + 0.6 && y < groundHeight(c.x, c.z) + 9;
+      });
+
     this.npcs = new NpcManager(scene, this.mats, builder.npcSpots);
+    for (const n of this.npcs.list) {
+      this.gfx.addCasters(n.char.meshes);
+      this.gfx.addReceivers(n.char.meshes);
+    }
     this.env = new EnvironmentSim(Math.random, state.data.env);
 
     this.input = new Input(canvas);
     this.ui = new UI(document.getElementById('ui')!, state, this.audio, isTouch, {
       summonBoat: () => this.summonBoat(),
+      toggleFullscreen: () => void this.toggleFullscreen(),
       interact: () => this.interact(),
       jump: () => (this.jumpQueued = true),
       resetSave: () => this.resetSave(),
       settingsChanged: () => this.applySettings(),
       panelChanged: (open) => {
         if (open) this.fishing.cancel();
-        this.input.setPrimary(false);
+        this.input.releaseAll();
       },
     });
     this.input.blocked = () => this.ui.modalOpen;
@@ -155,12 +182,25 @@ export class Game {
     };
     this.ui.onAction = (down) => {
       this.audio.init();
-      this.input.setPrimary(down);
+      this.input.hold('action', down);
     };
+    this.ui.onHold = (source, down) => this.input.hold(source, down);
+    // Çekme sırasında ekranın her yerine basmak çubuğu sağa iter (mobil rahatlığı)
+    const holdMode = () => this.fishing.state === 'reeling' || this.fishing.state === 'bite';
+    this.ui.holdMode = holdMode;
+    this.input.touchHold = holdMode;
+    this.cam.ignoreTouch = holdMode;
+    onFullscreenChange(() => {
+      this.engine.resize();
+      this.ui.setFullscreenState(isFullscreen(), fullscreenSupported() || isIOS());
+    });
+    this.ui.setFullscreenState(isFullscreen(), (fullscreenSupported() || isIOS()) && !isStandalone());
+    this.ui.setBoatAvailable(state.data.ownedBoats.length > 0);
 
     this.fishing = new FishingController({
       scene, mats: this.mats, player: this.player, state, env: this.env, audio: this.audio, ui: this.ui,
       effects: this.effects, camera: this.cam, glow: this.glow,
+      haptic: (p) => this.haptic(p),
     });
 
     this.wireInput();
@@ -209,6 +249,9 @@ export class Game {
     if (!this.state.data.tutorialDone) {
       this.ui.openHelp();
       this.state.data.tutorialDone = true;
+    }
+    if (this.ui.isTouch && window.innerHeight > window.innerWidth) {
+      this.ui.toast('🔄 Daha rahat oynamak için telefonu yatay çevir.', 'info', 5000);
     }
   }
 
@@ -268,6 +311,9 @@ export class Game {
         case 'KeyH':
           toggle(() => this.ui.openHelp());
           break;
+        case 'KeyU':
+          void this.toggleFullscreen();
+          break;
         case 'KeyM':
           this.state.data.settings.muted = !this.state.data.settings.muted;
           this.applySettings();
@@ -298,9 +344,9 @@ export class Game {
         this.ui.toast(`[debug] Hava: ${WEATHER_NAMES[env.weather]}`);
         break;
       }
-      case 'KeyU':
+      case 'KeyY':
         env.startNuke();
-        this.ui.toast('[debug] Nükleer olay');
+        this.ui.toast('[debug] Yeşil Şafak');
         break;
       case 'KeyC':
         this.state.addCash(100000);
@@ -328,11 +374,28 @@ export class Game {
       if (this.fishing.state !== 'reeling') this.ui.toast(`📜 Görev tamamlandı: ${q.title}!`, 'rare', 4500);
     });
     s.events.on('boats', () => {
+      this.ui.setBoatAvailable(s.data.ownedBoats.length > 0);
       if (this.boat && this.boat.def.id !== s.data.selectedBoat && !this.player.boat) {
         this.boat.dispose();
         this.boat = null;
       }
     });
+  }
+
+  /** Tam ekranı aç/kapat; iPhone'da Ana Ekrana Ekle ipucu gösterir. */
+  async toggleFullscreen(): Promise<void> {
+    if (!fullscreenSupported()) {
+      if (isIOS()) this.ui.toast('iPhone/iPad\'de tam ekran için: Paylaş ⬆️ → "Ana Ekrana Ekle", sonra oyunu oradan aç.', 'info', 6000);
+      else this.ui.toast('Bu tarayıcı tam ekranı desteklemiyor.', 'bad');
+      return;
+    }
+    await toggleFullscreen(this.ui.isTouch);
+    window.setTimeout(() => this.engine.resize(), 250);
+  }
+
+  /** Dokunmatik titreşim (ayar açıksa). */
+  haptic(pattern: number | number[]): void {
+    if (this.ui.isTouch && this.state.data.settings.haptics) vibrate(pattern);
   }
 
   private applySettings(): void {
@@ -362,7 +425,7 @@ export class Game {
     const p = this.player.position;
     const isl = islandAt(p.x, p.z, true);
     if (isl) return isl.id;
-    return inTrench(p.x, p.z) ? 'deep' : 'ocean';
+    return inTrench(p.x, p.z) ? 'abis' : 'acikdeniz';
   }
 
   private interact(): void {
@@ -390,7 +453,7 @@ export class Game {
     }
     const def = this.state.selectedBoat;
     if (!def) {
-      this.ui.toast('Teknen yok! Moosewood Tersanesi\'nden bir Kano al (300 C$).', 'bad', 4000);
+      this.ui.toast('Teknen yok! Çamlıkoy Kayıkhanesi\'nden bir Kayık al (300 akçe).', 'bad', 4000);
       return;
     }
     const p = this.player.position;
@@ -400,10 +463,15 @@ export class Game {
       this.audio.error();
       return;
     }
-    this.boat?.dispose();
+    if (this.boat) {
+      this.gfx.removeCasters([this.boat.mesh]);
+      this.boat.dispose();
+    }
     const heading = Math.atan2(spot.x - p.x, spot.z - p.z);
     this.boat = new Boat(this.scene, this.mats, this.effects, BOATS_BY_ID[def.id], spot.x, spot.z, heading);
     this.water.addToRenderList(this.boat.mesh);
+    this.gfx.addCasters([this.boat.mesh]);
+    this.gfx.addReceivers([this.boat.mesh]);
     this.effects.splash(new Vector3(spot.x, 0.1, spot.z), 1.6);
     this.audio.splash(1.2);
     this.ui.toast(`${def.name} hazır! Yanına gidip E ile bin.`, 'good');
@@ -438,6 +506,8 @@ export class Game {
   // ───────────── Ana döngü ─────────────
   private frame(): void {
     const dt = Math.min(0.1, this.engine.getDeltaTime() / 1000);
+    this.gfx.adapt(dt);
+    this.gfx.focus(this.player.position);
     this.update(dt);
     this.scene.render();
   }
@@ -471,10 +541,10 @@ export class Game {
       this.ui.toast(`${icons[changes.weather]} Hava değişti: ${WEATHER_NAMES[changes.weather]}`);
     }
     if (changes.nukeStarted) {
-      this.ui.toast('☢️ NÜKLEER OLAY! Nükleer varyantlı balıklar ortaya çıktı!', 'rare', 6000);
+      this.ui.toast('🟢 YEŞİL ŞAFAK! Gökyüzü yeşile döndü, Fosforlu balıklar ortaya çıktı!', 'rare', 6000);
       this.audio.error();
     }
-    if (changes.nukeEnded) this.ui.toast('☢️ Nükleer olay sona erdi.');
+    if (changes.nukeEnded) this.ui.toast('🟢 Yeşil Şafak sona erdi.');
     if (changes.season) this.ui.toast(`🍃 Mevsim değişti: ${SEASON_NAMES[changes.season]}`, 'good', 4500);
 
     const followPos = this.player.boat ? this.player.position.add(new Vector3(0, -0.6, 0)) : this.player.position;
@@ -520,17 +590,28 @@ export class Game {
   }
 
   private updatePrompt(): void {
+    // Mobil eylem butonu: duruma göre simge/etiket
+    if (this.ui.isTouch) {
+      const st = this.fishing.state;
+      this.ui.setActionMode(
+        this.ui.catchVisible ? 'continue'
+          : st === 'charging' ? 'release'
+            : st === 'reeling' || st === 'bite' ? 'reel'
+              : st === 'waiting' || st === 'casting' ? 'wait'
+                : this.player.swimming ? 'swim' : 'cast',
+      );
+    }
     if (this.ui.modalOpen || this.fishing.locksMovement) {
       this.ui.setPrompt(null);
       return;
     }
     const p = this.player;
     if (p.boat) {
-      this.ui.setPrompt(`[E] ${p.boat.def.name}'dan in`);
+      this.ui.setPrompt(`[E] ${p.boat.def.name}'dan in`, '⬅️');
     } else if (this.nearestNpc) {
-      this.ui.setPrompt(`[E] ${this.nearestNpc.def.name} ile konuş`);
+      this.ui.setPrompt(`[E] ${this.nearestNpc.def.name} ile konuş`, '💬');
     } else if (this.boat && Vector3.Distance(p.position, this.boat.seatWorld()) < 7) {
-      this.ui.setPrompt(`[E] ${this.boat.def.name}'ya bin`);
+      this.ui.setPrompt(`[E] ${this.boat.def.name}'ya bin`, '⛵');
     } else {
       this.ui.setPrompt(null);
     }
@@ -544,9 +625,9 @@ export class Game {
     const isl = islandAt(this.player.position.x, this.player.position.z, true);
     if (isl) this.ui.showZoneBanner(isl.name, isl.subtitle);
     else if (inTrench(this.player.position.x, this.player.position.z)) {
-      const st = ISLANDS_BY_ID['deep'];
-      this.ui.showZoneBanner('Derinlikler', this.player.boat?.def.allowsDeep ? 'Batiskaf ile abis balıkları seni bekliyor' : st.subtitle);
-    } else this.ui.showZoneBanner(REGION_NAMES.ocean, 'Açık deniz balıkları · Tekneden balık tut');
+      const st = ISLANDS_BY_ID['abis'];
+      this.ui.showZoneBanner('Abis Çukuru', this.player.boat?.def.allowsDeep ? 'Batiskaf ile abis balıkları seni bekliyor' : st.subtitle);
+    } else this.ui.showZoneBanner(REGION_NAMES.acikdeniz, 'Açık deniz balıkları · Tekneden balık tut');
   }
 
   private updateEnvironmentVisuals(dt: number): void {
@@ -555,7 +636,7 @@ export class Game {
     const sunDir = new Vector3(sunV.x, sunV.y, sunV.z);
     const daylight = env.daylight();
     const p = this.player.position;
-    const nearSnow = Math.hypot(p.x - ISLANDS_BY_ID['snowcap'].cx, p.z - ISLANDS_BY_ID['snowcap'].cz) < 260;
+    const nearSnow = Math.hypot(p.x - ISLANDS_BY_ID['ayazburun'].cx, p.z - ISLANDS_BY_ID['ayazburun'].cz) < 260;
     const winter = env.season === 'winter';
     const deep = inTrench(p.x, p.z) ? 1 : 0;
     const k = 1 - Math.exp(-dt * 0.6);
@@ -606,10 +687,12 @@ export class Game {
     const lightDir = sunDir.y > -0.05 ? sunDir : sunDir.scale(-1).add(new Vector3(0, 0.3, 0)).normalize();
     this.sun.direction = lightDir.scale(-1);
     const storm = 1 - f.rain * 0.45;
-    this.sun.intensity = (daylight * 1.15 + (1 - daylight) * 0.32) * storm;
+    // Yüksek kalitede gölgeler okunsun diye güneş güçlü, ortam ışığı zayıf
+    const hq = this.gfx.high;
+    this.sun.intensity = (daylight * (hq ? 1.75 : 1.15) + (1 - daylight) * 0.32) * storm;
     this.sun.diffuse = daylight > 0.05 ? sunColor : C('#9ab4ff');
     this.sun.specular = this.sun.diffuse.scale(0.6);
-    this.hemi.intensity = (0.4 + 0.42 * daylight) * (1 - f.rain * 0.25) + f.aurora * 0.15 + f.nuke * 0.1;
+    this.hemi.intensity = (0.4 + (hq ? 0.12 : 0.42) * daylight) * (1 - f.rain * 0.25) + f.aurora * 0.15 + f.nuke * 0.1 + (hq ? f.rain * 0.25 : 0);
     this.hemi.diffuse = Color3.Lerp(C('#7a8cc8'), C('#dcecff'), daylight).add(C('#3aff7a').scale(f.aurora * 0.15 + f.nuke * 0.25));
     this.hemi.groundColor = Color3.Lerp(C('#141a2a'), C('#6a6a5a'), daylight);
 
@@ -618,7 +701,19 @@ export class Game {
 
     const night = 1 - daylight;
     this.mats.lamps.emissiveColor = new Color3(1, 0.82, 0.5).scale(0.2 + night * 1.0);
-    this.mats.vertexColor.diffuseColor = hex(SEASON_TINT[env.season]);
+    const tint = hex(SEASON_TINT[env.season]);
+    this.mats.terrain.diffuseColor = tint.scale(1.22);
+    this.mats.nature.diffuseColor = tint.scale(1.2);
+    this.gfx.setDaylight(daylight, f.rain);
+    // Kıyı köpüğü: yavaşça kayar ve nefes alır
+    this.foamTime += dt;
+    const foamTex = this.mats.foam.diffuseTexture;
+    if (foamTex) {
+      (foamTex as Texture).uOffset = this.foamTime * 0.012;
+      (foamTex as Texture).vOffset = Math.sin(this.foamTime * 0.7) * 0.06;
+    }
+    this.mats.foam.emissiveColor = new Color3(0.12, 0.14, 0.16).scale(0.4 + daylight * 0.8);
+    this.mats.foam.alpha = 0.75 + Math.sin(this.foamTime * 0.7) * 0.15;
 
     this.effects.setRain(rainVisual);
     this.effects.setSnow(f.snow);

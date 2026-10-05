@@ -48,9 +48,9 @@ export function bestiaryCompletion(bestiary: Bestiary): number {
 }
 
 export const REGION_REWARDS: Record<RegionId, { cash: number; luck: number }> = {
-  moosewood: { cash: 5000, luck: 5 },
-  roslit: { cash: 25000, luck: 5 },
-  snowcap: { cash: 40000, luck: 5 },
-  ocean: { cash: 50000, luck: 5 },
-  deep: { cash: 150000, luck: 10 },
+  camlikoy: { cash: 5000, luck: 5 },
+  kizilkaya: { cash: 25000, luck: 5 },
+  ayazburun: { cash: 40000, luck: 5 },
+  acikdeniz: { cash: 50000, luck: 5 },
+  abis: { cash: 150000, luck: 10 },
 };

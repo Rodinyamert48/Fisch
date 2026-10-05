@@ -8,6 +8,7 @@ import type { Mesh } from '@babylonjs/core/Meshes/mesh';
 import type { GlowLayer } from '@babylonjs/core/Layers/glowLayer';
 import type { Scene } from '@babylonjs/core/scene';
 import { RARITIES } from '../core/data/rarities';
+import { VARIANTS } from '../core/data/variants';
 import { biteDelay, rollCatch, totalLureSpeed, type CatchRoll } from '../core/catchRoller';
 import { CastMeter, type CastRating } from '../core/castMeter';
 import { catchXp, fishValue, perfectBonusCash } from '../core/economy';
@@ -37,6 +38,7 @@ export interface FishingDeps {
   effects: Effects;
   camera: CameraController;
   glow: GlowLayer | null;
+  haptic: (pattern: number | number[]) => void;
 }
 
 const LINE_POINTS = 14;
@@ -58,7 +60,7 @@ export class FishingController {
   private castDist = 10;
   private rating: CastRating = 'meh';
   private roll: CatchRoll | null = null;
-  private region: RegionId = 'moosewood';
+  private region: RegionId = 'camlikoy';
   private usedBait: BaitDef | null = null;
   private biteTimer = 0;
   private biteTotal = 0;
@@ -151,11 +153,19 @@ export class FishingController {
     this.d.audio.whoosh(power);
     this.castDist = CastMeter.distance(power);
     const p = this.d.player;
-    const yaw = p.aimYaw ?? p.yaw;
+    let yaw = p.aimYaw ?? p.yaw;
+    // Nişan yardımı: hedef karadaysa en yakın açıda/mesafede suya yönlendir
+    const fix = this.aimAssist(p.position, yaw, this.castDist + 1.5);
+    if (fix) {
+      yaw = fix.yaw;
+      this.castDist = fix.dist - 1.5;
+      p.aimYaw = yaw;
+    }
     const dir = new Vector3(Math.sin(yaw), 0, Math.cos(yaw));
     this.castFrom = p.tipPosition();
     this.castTo = p.position.add(dir.scale(this.castDist + 1.5));
     this.castTo.y = 0.05;
+    if (rating === 'perfect') this.d.haptic(35);
     this.castT = 0;
     this.castDur = 0.55 + this.castDist * 0.018;
     this.d.state.data.stats.casts++;
@@ -163,6 +173,22 @@ export class FishingController {
     this.bobber.setEnabled(true);
     this.line.setEnabled(true);
     this.setState('casting');
+  }
+
+  /** Hedef karadaysa ±80° içinde ve daha kısa mesafelerde su arar. */
+  private aimAssist(from: Vector3, yaw: number, dist: number): { yaw: number; dist: number } | null {
+    const isWater = (y: number, d: number) => groundHeight(from.x + Math.sin(y) * d, from.z + Math.cos(y) * d) < -0.6;
+    if (isWater(yaw, dist)) return null;
+    for (const k of [1, 0.85, 0.7, 0.55]) {
+      const d = Math.max(7, dist * k);
+      for (let step = 1; step <= 11; step++) {
+        for (const sgn of [1, -1]) {
+          const y = yaw + sgn * step * 0.125;
+          if (isWater(y, d)) return { yaw: y, dist: d };
+        }
+      }
+    }
+    return null;
   }
 
   private land(): void {
@@ -181,9 +207,9 @@ export class FishingController {
     const boat = this.d.player.boat;
     this.usedBait = s.consumeBait();
     this.region = regionAt(to.x, to.z, !!boat?.def.allowsDeep);
-    if (this.region === 'ocean' && inTrench(to.x, to.z) && !this.trenchHintShown) {
+    if (this.region === 'acikdeniz' && inTrench(to.x, to.z) && !this.trenchHintShown) {
       this.trenchHintShown = true;
-      this.d.ui.toast('Derinlikler balıkları için Batiskaf gerekli. Burada açık deniz balıkları var.', 'info', 4500);
+      this.d.ui.toast('Abis balıkları için Batiskaf gerekli. Burada açık deniz balıkları var.', 'info', 4500);
     }
     const perfect = this.rating === 'perfect';
     this.roll = rollCatch(
@@ -225,6 +251,7 @@ export class FishingController {
     this.d.ui.setHint(null);
     this.d.ui.biteAlert(r.order >= 4 ? r.color : '#ffd23f');
     this.d.audio.bite(r.hookPitch, r.order);
+    this.d.haptic(r.order >= 4 ? [60, 40, 120] : 70);
     this.d.effects.splash(this.bobber.position.clone(), 0.6 + r.order * 0.08);
     this.d.camera.addShake(0.4 + r.order * 0.05);
     this.dip = 0.6;
@@ -250,6 +277,7 @@ export class FishingController {
     this.reel = null;
     if (!won) {
       this.d.audio.fail();
+      this.d.haptic(180);
       this.d.ui.toast(`${this.roll?.fish.name ?? 'Balık'} kaçtı!`, 'bad');
       this.d.state.data.stats.escaped++;
       this.resetToIdle();
@@ -261,7 +289,7 @@ export class FishingController {
     const perfect = reel.perfect;
     const value = fishValue(fish, roll.weight, roll.variant);
     const xp = catchXp(fish, perfect);
-    const bonus = perfect ? perfectBonusCash(value, s.rod.passive === 'champion') : 0;
+    const bonus = perfect ? perfectBonusCash(value, s.rod.passive === 'usta') : 0;
     const caught: CaughtFish = {
       uid: makeUid(),
       fishId: fish.id,
@@ -275,9 +303,11 @@ export class FishingController {
     const outcome = s.recordCatch(caught, xp, bonus);
     const r = RARITIES[fish.rarity];
     this.d.audio.success(r.order, perfect);
+    this.d.haptic(r.celebrate ? [80, 50, 80, 50, 220] : [40, 40, 60]);
     const pp = this.d.player.position;
     this.d.effects.splash(this.bobber.position.clone(), 1.1);
-    if (r.celebrate || roll.variant !== 'none') this.d.effects.lightPillar(new Vector3(pp.x, 0, pp.z), roll.variant !== 'none' && !r.celebrate ? '#ffffff' : r.color, 6 + r.order * 0.4);
+    if (r.celebrate) this.d.effects.lightPillar(new Vector3(pp.x, 0, pp.z), r.color, 6 + r.order * 0.4);
+    else if (roll.variant !== 'none') this.d.effects.confetti(pp.add(new Vector3(0, 2.5, 0)), [VARIANTS[roll.variant].color, '#ffffff']);
     if (perfect) this.d.effects.confetti(pp.add(new Vector3(0, 2.5, 0)));
     if (outcome.levelUps.length) this.d.effects.confetti(pp.add(new Vector3(0, 3, 0)), ['#7ad8ff', '#ffffff', '#ffd23f']);
     this.bobber.setEnabled(false);
@@ -288,7 +318,7 @@ export class FishingController {
     const model = buildFishModel(this.d.scene, this.d.mats, fish, roll.variant, 1);
     model.root.parent = this.d.camera.camera;
     model.root.position.set(0, 0.25, 4.6);
-    const glowing = ['shiny', 'golden', 'nuclear', 'celestial', 'prismize'].includes(roll.variant);
+    const glowing = ['fosfor', 'takimyildiz', 'tayf'].includes(roll.variant);
     if (glowing) this.d.glow?.addIncludedOnlyMesh(model.mesh);
     this.showcase = model;
 

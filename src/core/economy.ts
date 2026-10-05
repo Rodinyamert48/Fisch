@@ -2,19 +2,19 @@ import { RARITIES } from './data/rarities';
 import { VARIANTS } from './data/variants';
 import type { FishDef, VariantId } from './types';
 
-/** Balığın satış değeri (C$). Ağırlık ve varyanta göre ölçeklenir. */
+/** Balığın satış değeri (akçe). Ağırlık ve varyanta göre ölçeklenir. */
 export function fishValue(fish: FishDef, weight: number, variant: VariantId): number {
   const weightFactor = 0.55 + 0.45 * (weight / fish.avgWeight);
   return Math.max(1, Math.round(fish.baseValue * weightFactor * VARIANTS[variant].valueMult));
 }
 
-/** Yakalamadan kazanılan XP. Mükemmel yakalama 1.5x. */
+/** Yakalamadan kazanılan XP. Kusursuz yakalama 1.5x. */
 export function catchXp(fish: FishDef, perfect: boolean): number {
   const base = RARITIES[fish.rarity].xp;
   return Math.round(base * (perfect ? 1.5 : 1));
 }
 
-/** Mükemmel yakalama için anında verilen ekstra C$ (değerin %25'i, Şampiyon pasifiyle %75). */
+/** Kusursuz yakalama için anında verilen ekstra akçe (değerin %25'i, Martı Oltası pasifiyle %75). */
 export function perfectBonusCash(value: number, championPassive: boolean): number {
   return Math.round(value * (championPassive ? 0.75 : 0.25));
 }
@@ -41,7 +41,7 @@ export function levelLuckBonus(level: number): number {
 }
 
 export function formatCash(n: number): string {
-  return `${Math.floor(n).toLocaleString('tr-TR')} C$`;
+  return `${Math.floor(n).toLocaleString('tr-TR')} akçe`;
 }
 
 export function formatWeight(kg: number): string {

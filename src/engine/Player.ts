@@ -47,7 +47,9 @@ export class Player {
     private readonly colliders: Collider[],
     spawn: Vector3,
   ) {
-    this.char = new Character(scene, mats, 'player', { shirt: '#2f7de1', pants: '#2b2f3a', skin: '#f2c49b', hat: '#e8483a' });
+    this.char = new Character(scene, mats, 'player', {
+      shirt: '#3a6ea8', pants: '#3a4150', skin: '#e9bf98', hair: '#4a3020', hat: '#d8a23a', hatStyle: 'bucket', vest: '#5a6a3a', boots: '#4a3020',
+    });
     this.position = spawn.clone();
 
     // Olta
@@ -57,7 +59,7 @@ export class Player {
     const len = 2.8;
     this.rodMat = new StandardMaterial('rodMat', scene);
     this.rodMat.specularColor = new Color3(0.3, 0.3, 0.3);
-    this.rodMesh = CreateCylinder('rod', { height: len, diameterTop: 0.035, diameterBottom: 0.09, tessellation: 6 }, scene);
+    this.rodMesh = CreateCylinder('rod', { height: len, diameterTop: 0.018, diameterBottom: 0.055, tessellation: 8 }, scene);
     this.rodMesh.material = this.rodMat;
     this.rodMesh.parent = this.rodRoot;
     this.rodMesh.rotation.x = Math.PI / 2;

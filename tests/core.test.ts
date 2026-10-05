@@ -23,8 +23,8 @@ import { mulberry32 } from '../src/core/rng';
 import { groundHeight, regionAt, terrainHeight, townCenter, PLATFORMS } from '../src/core/worldMap';
 
 const baseCtx = (over: Partial<CatchContext> = {}): CatchContext => ({
-  region: 'moosewood',
-  rod: getRod('training'),
+  region: 'camlikoy',
+  rod: getRod('acemi'),
   bait: null,
   bonusLuck: 0,
   time: 'day',
@@ -49,8 +49,8 @@ describe('veri bütünlüğü', () => {
   });
 
   it('olta fiyatları 500 C$ Çelimsiz → 15.000.000 C$ Ethereal Prism', () => {
-    expect(getRod('flimsy').price).toBe(500);
-    expect(getRod('ethereal').price).toBe(15_000_000);
+    expect(getRod('kamis').price).toBe(500);
+    expect(getRod('tayf').price).toBe(15_000_000);
     const tiers = RODS.map((r) => r.tier);
     expect([...tiers].sort((a, b) => a - b)).toEqual(tiers);
   });
@@ -74,8 +74,8 @@ describe('veri bütünlüğü', () => {
 
 describe('yakalama zarı', () => {
   it('koşullar havuzu filtreler (gece, hava, mevsim)', () => {
-    const day = fishPool('moosewood', { time: 'day', weather: 'clear', season: 'spring', nukeEvent: false });
-    const night = fishPool('moosewood', { time: 'night', weather: 'fog', season: 'autumn', nukeEvent: false });
+    const day = fishPool('camlikoy', { time: 'day', weather: 'clear', season: 'spring', nukeEvent: false });
+    const night = fishPool('camlikoy', { time: 'night', weather: 'fog', season: 'autumn', nukeEvent: false });
     expect(day.some((f) => f.id === 'gece_yayini')).toBe(false);
     expect(night.some((f) => f.id === 'gece_yayini')).toBe(true);
     expect(night.some((f) => f.id === 'kirmizi_somon')).toBe(true);
@@ -84,7 +84,7 @@ describe('yakalama zarı', () => {
   });
 
   it('şans nadir balık olasılığını artırır', () => {
-    const pool = fishPool('moosewood', { time: 'night', weather: 'rain', season: 'autumn', nukeEvent: false });
+    const pool = fishPool('camlikoy', { time: 'night', weather: 'rain', season: 'autumn', nukeEvent: false });
     const low = rarityDistribution(pool, 0);
     const high = rarityDistribution(pool, 300);
     expect(high.legendary!).toBeGreaterThan(low.legendary!);
@@ -96,8 +96,8 @@ describe('yakalama zarı', () => {
   it('rollCatch her zaman bölgedeki bir balığı döndürür', () => {
     const rng = mulberry32(42);
     for (let i = 0; i < 500; i++) {
-      const r = rollCatch(baseCtx({ region: 'snowcap' }), rng);
-      expect(r.fish.regions === 'all' || r.fish.regions.includes('snowcap')).toBe(true);
+      const r = rollCatch(baseCtx({ region: 'ayazburun' }), rng);
+      expect(r.fish.regions === 'all' || r.fish.regions.includes('ayazburun')).toBe(true);
       expect(r.weight).toBeGreaterThanOrEqual(r.fish.minWeight);
       expect(r.weight).toBeLessThanOrEqual(r.fish.maxWeight);
     }
@@ -107,35 +107,35 @@ describe('yakalama zarı', () => {
     const rng = mulberry32(7);
     let prism = 0;
     const n = 4000;
-    for (let i = 0; i < n; i++) if (rollVariant(baseCtx({ rod: getRod('ethereal') }), rng) === 'prismize') prism++;
+    for (let i = 0; i < n; i++) if (rollVariant(baseCtx({ rod: getRod('tayf') }), rng) === 'tayf') prism++;
     expect(prism / n).toBeGreaterThan(0.45);
     expect(prism / n).toBeLessThan(0.55);
-    for (let i = 0; i < 2000; i++) expect(rollVariant(baseCtx({ rod: getRod('carbon') }), rng)).not.toBe('prismize');
+    for (let i = 0; i < 2000; i++) expect(rollVariant(baseCtx({ rod: getRod('bambu') }), rng)).not.toBe('tayf');
   });
 
   it('Nükleer yalnızca Nükleer Olay sırasında', () => {
     const rng = mulberry32(9);
-    for (let i = 0; i < 3000; i++) expect(rollVariant(baseCtx(), rng)).not.toBe('nuclear');
+    for (let i = 0; i < 3000; i++) expect(rollVariant(baseCtx(), rng)).not.toBe('fosfor');
     let nuclear = 0;
-    for (let i = 0; i < 3000; i++) if (rollVariant(baseCtx({ nukeEvent: true }), rng) === 'nuclear') nuclear++;
+    for (let i = 0; i < 3000; i++) if (rollVariant(baseCtx({ nukeEvent: true }), rng) === 'fosfor') nuclear++;
     expect(nuclear).toBeGreaterThan(300);
   });
 
   it('Batık yalnızca özel olta ile', () => {
     const rng = mulberry32(5);
-    for (let i = 0; i < 3000; i++) expect(rollVariant(baseCtx({ rod: getRod('steady') }), rng)).not.toBe('sunken');
+    for (let i = 0; i < 3000; i++) expect(rollVariant(baseCtx({ rod: getRod('capa') }), rng)).not.toBe('kabuklu');
     let sunken = 0;
-    for (let i = 0; i < 3000; i++) if (rollVariant(baseCtx({ rod: getRod('trident') }), rng) === 'sunken') sunken++;
+    for (let i = 0; i < 3000; i++) if (rollVariant(baseCtx({ rod: getRod('enkaz') }), rng) === 'kabuklu') sunken++;
     expect(sunken).toBeGreaterThan(200);
   });
 
   it('varyant olasılıkları önerilen aralıklarda', () => {
-    expect(VARIANTS.shiny.chance).toBeGreaterThanOrEqual(0.01);
-    expect(VARIANTS.shiny.chance).toBeLessThanOrEqual(0.05);
-    expect(VARIANTS.golden.chance).toBeGreaterThanOrEqual(0.001);
-    expect(VARIANTS.golden.chance).toBeLessThanOrEqual(0.01);
-    expect(VARIANTS.celestial.chance).toBeGreaterThanOrEqual(0.0001);
-    expect(VARIANTS.celestial.chance).toBeLessThanOrEqual(0.001);
+    expect(VARIANTS.sedef.chance).toBeGreaterThanOrEqual(0.01);
+    expect(VARIANTS.sedef.chance).toBeLessThanOrEqual(0.05);
+    expect(VARIANTS.yaldiz.chance).toBeGreaterThanOrEqual(0.001);
+    expect(VARIANTS.yaldiz.chance).toBeLessThanOrEqual(0.01);
+    expect(VARIANTS.takimyildiz.chance).toBeGreaterThanOrEqual(0.0001);
+    expect(VARIANTS.takimyildiz.chance).toBeLessThanOrEqual(0.001);
   });
 
   it('yem hızı oltaya gelme süresini kısaltır, nadir balıklar daha uzun bekler', () => {
@@ -169,7 +169,7 @@ describe('atış çubuğu', () => {
 describe('çekme mini oyunu', () => {
   const fish = FISH_BY_ID['sazan'];
   it('balığı takip eden oyuncu mükemmel yakalama yapar', () => {
-    const params = reelParamsFor(fish, 4, getRod('carbon'));
+    const params = reelParamsFor(fish, 4, getRod('bambu'));
     const g = new ReelMinigame(params, mulberry32(11));
     let t = 0;
     while (g.status === 'playing' && t < 30) {
@@ -183,7 +183,7 @@ describe('çekme mini oyunu', () => {
   });
 
   it('hiç basmayan oyuncu kaybeder ve mükemmel değildir', () => {
-    const params = reelParamsFor(fish, 4, getRod('training'));
+    const params = reelParamsFor(fish, 4, getRod('acemi'));
     const g = new ReelMinigame(params, mulberry32(3));
     let t = 0;
     while (g.status === 'playing' && t < 60) {
@@ -196,19 +196,19 @@ describe('çekme mini oyunu', () => {
 
   it('maks ağırlığı aşan balık çok daha yavaş dolar, Sabit Olta cezayı azaltır', () => {
     const tuna = FISH_BY_ID['sari_ton'];
-    const ok = reelParamsFor(tuna, 40, getRod('carbon'));
-    const heavy = reelParamsFor(tuna, 40, getRod('training'));
+    const ok = reelParamsFor(tuna, 40, getRod('bambu'));
+    const heavy = reelParamsFor(tuna, 40, getRod('acemi'));
     expect(heavy.overweight).toBe(true);
     expect(heavy.fillRate).toBeLessThan(ok.fillRate);
     const sunfish = FISH_BY_ID['ay_baligi'];
-    const champion = reelParamsFor(sunfish, 1200, getRod('champion'));
-    const steadyLike = { ...getRod('champion'), passive: 'steady' as const };
+    const champion = reelParamsFor(sunfish, 1200, getRod('marti'));
+    const steadyLike = { ...getRod('marti'), passive: 'agir' as const };
     expect(reelParamsFor(sunfish, 1200, steadyLike).fillRate).toBeGreaterThan(champion.fillRate);
   });
 
   it('kontrol çubuğu genişliğini, direnç kaybı etkiler', () => {
-    const a = reelParamsFor(fish, 4, getRod('training'));
-    const b = reelParamsFor(fish, 4, getRod('ethereal'));
+    const a = reelParamsFor(fish, 4, getRod('acemi'));
+    const b = reelParamsFor(fish, 4, getRod('tayf'));
     expect(b.barWidth).toBeGreaterThan(a.barWidth);
     expect(b.lossRate).toBeLessThan(a.lossRate);
   });
@@ -219,7 +219,7 @@ describe('ekonomi ve ilerleme', () => {
     const f = FISH_BY_ID['levrek'];
     expect(fishValue(f, f.avgWeight, 'none')).toBe(f.baseValue);
     expect(fishValue(f, f.avgWeight * 2, 'none')).toBeGreaterThan(f.baseValue);
-    expect(fishValue(f, f.avgWeight, 'golden')).toBe(f.baseValue * 3);
+    expect(fishValue(f, f.avgWeight, 'yaldiz')).toBe(f.baseValue * 3);
   });
 
   it('seviye hesabı', () => {
@@ -230,13 +230,13 @@ describe('ekonomi ve ilerleme', () => {
 
   it('olta satın alma şartları', () => {
     const s = new PlayerState();
-    expect(s.buyRod('flimsy').ok).toBe(false);
+    expect(s.buyRod('kamis').ok).toBe(false);
     s.addCash(600);
-    expect(s.buyRod('flimsy').ok).toBe(true);
+    expect(s.buyRod('kamis').ok).toBe(true);
     expect(s.cash).toBe(100);
-    expect(s.rod.id).toBe('flimsy');
+    expect(s.rod.id).toBe('kamis');
     s.addCash(20_000_000);
-    const r = s.buyRod('ethereal');
+    const r = s.buyRod('tayf');
     expect(r.ok).toBe(false);
   });
 
@@ -245,14 +245,14 @@ describe('ekonomi ve ilerleme', () => {
     expect(s.acceptQuest('q_ilk_adim').ok).toBe(true);
     for (let i = 0; i < 5; i++) {
       s.recordCatch(
-        { uid: `u${i}`, fishId: 'sazan', weight: 3 + i, variant: i === 4 ? 'shiny' : 'none', perfect: i === 0, value: 20, region: 'moosewood', caughtAt: 0 },
+        { uid: `u${i}`, fishId: 'sazan', weight: 3 + i, variant: i === 4 ? 'sedef' : 'none', perfect: i === 0, value: 20, region: 'camlikoy', caughtAt: 0 },
         12,
         0,
       );
     }
     expect(s.data.bestiary['sazan'].count).toBe(5);
     expect(s.data.bestiary['sazan'].maxWeight).toBe(7);
-    expect(s.data.bestiary['sazan'].variants).toEqual(['shiny']);
+    expect(s.data.bestiary['sazan'].variants).toEqual(['sedef']);
     expect(s.data.quests['q_ilk_adim'].status).toBe('done');
     expect(s.data.baits['solucan']).toBe(10);
     expect(s.cash).toBe(250);
@@ -277,7 +277,7 @@ describe('ekonomi ve ilerleme', () => {
     s.addCash(1234);
     const copy = PlayerState.deserialize(s.serialize());
     expect(copy.cash).toBe(1234);
-    expect(copy.rod.id).toBe('training');
+    expect(copy.rod.id).toBe('acemi');
   });
 });
 
@@ -319,9 +319,44 @@ describe('dünya', () => {
   });
 
   it('bölge tespiti', () => {
-    expect(regionAt(0, 120, false)).toBe('moosewood');
-    expect(regionAt(60, 660, false)).toBe('ocean');
-    expect(regionAt(60, 660, true)).toBe('deep');
-    expect(regionAt(250, -300, false)).toBe('ocean');
+    expect(regionAt(0, 120, false)).toBe('camlikoy');
+    expect(regionAt(60, 660, false)).toBe('acikdeniz');
+    expect(regionAt(60, 660, true)).toBe('abis');
+    expect(regionAt(250, -300, false)).toBe('acikdeniz');
+  });
+});
+
+describe('özgün içerik ve kayıt taşıma', () => {
+  it('eski sürüm kaydı yeni kimliklere taşınır', () => {
+    const old = {
+      version: 1, cash: 50, xp: 10,
+      ownedRods: ['training', 'carbon'], equippedRod: 'carbon',
+      baits: {}, equippedBait: null, ownedBoats: ['kano'], selectedBoat: 'kano',
+      inventory: [{ uid: 'a', fishId: 'kor_mercan', weight: 7, variant: 'shiny', perfect: false, value: 10, region: 'moosewood', caughtAt: 0 }],
+      bestiary: { kor_mercan: { count: 1, maxWeight: 7, variants: ['shiny', 'prismize'], firstCaughtAt: 0 } },
+      quests: {}, regionRewards: ['moosewood'],
+      stats: { totalCaught: 1, perfectCatches: 0, totalEarned: 0, casts: 1, escaped: 0, biggest: { fishId: 'kor_mercan', weight: 7 } },
+      settings: { volume: 1, music: 1, muted: false, quality: 'auto' }, tutorialDone: true,
+    };
+    const s = PlayerState.deserialize(JSON.stringify(old));
+    expect(s.data.ownedRods).toEqual(['acemi', 'bambu']);
+    expect(s.rod.id).toBe('bambu');
+    expect(s.data.ownedBoats).toEqual(['kayik']);
+    expect(s.data.selectedBoat).toBe('kayik');
+    expect(s.data.inventory[0]).toMatchObject({ fishId: 'koz_lufer', variant: 'sedef', region: 'camlikoy' });
+    expect(s.data.bestiary['koz_lufer'].variants).toEqual(['sedef', 'tayf']);
+    expect(s.data.regionRewards).toEqual(['camlikoy']);
+  });
+
+  it('Fisch\'e ait özel isimler kullanılmaz', () => {
+    const banned = /moosewood|roslit|snowcap|ethereal|trident|whisker|ember snapper|\bmarc\b|fisch|prismize|c\$/i;
+    const names = [
+      ...FISH.map((f) => `${f.name} ${f.description}`),
+      ...RODS.map((r) => `${r.name} ${r.passiveText ?? ''}`),
+      ...Object.values(VARIANTS).map((v) => `${v.name} ${v.description}`),
+      ...ISLANDS.flatMap((i) => [i.name, i.subtitle, ...i.npcs.map((n) => `${n.name} ${n.lines.join(' ')}`), ...i.buildings.map((b) => b.label ?? '')]),
+      ...QUESTS.map((q) => `${q.title} ${q.description}`),
+    ];
+    for (const n of names) expect(n).not.toMatch(banned);
   });
 });

@@ -24,7 +24,7 @@ export function reelParamsFor(fish: FishDef, weight: number, rod: RodDef): ReelP
   const r = RARITIES[fish.rarity];
   const ratio = weight / rod.maxWeight;
   const overweight = ratio > 1;
-  const penaltyExp = rod.passive === 'steady' ? 0.5 : 1;
+  const penaltyExp = rod.passive === 'agir' ? 0.5 : 1;
   const weightPenalty = overweight ? Math.pow(ratio, penaltyExp) * 1.4 : 1;
   const strength = clamp(weight / fish.avgWeight, 0.5, 2.5);
   return {
@@ -45,7 +45,7 @@ export type ReelStatus = 'playing' | 'won' | 'lost';
  * - Basılı tutunca kontrol çubuğu sağa ivmelenir, bırakınca sola kayar.
  * - Balık simgesi mavi yol üzerinde rastgele hareket eder.
  * - Çubuk balığı kapsarsa ilerleme dolar, kapsamazsa geriler.
- * - Balık hiç çubuktan çıkmazsa "Mükemmel Yakalama".
+ * - Balık hiç çubuktan çıkmazsa "Kusursuz Yakalama".
  */
 export class ReelMinigame {
   barPos: number;

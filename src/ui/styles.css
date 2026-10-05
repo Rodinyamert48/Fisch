@@ -24,6 +24,8 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-touch-callout: none;
   background: #0b1626;
   color: var(--text);
   user-select: none;
@@ -207,6 +209,7 @@ button {
   gap: 8px;
 }
 .hud-bottom .menu-btn {
+  white-space: nowrap;
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -254,7 +257,9 @@ button {
   border-radius: 999px;
   font-size: 15px;
   display: none;
-  white-space: nowrap;
+  max-width: 92vw;
+  width: max-content;
+  text-align: center;
 }
 
 .zone-banner {
@@ -903,117 +908,211 @@ body.touch .mobile {
 body.touch .desktop-only {
   display: none !important;
 }
-.joystick {
+/* Sol yarı: yüzen joystick alanı */
+.joy-zone {
   position: absolute;
-  left: 22px;
-  bottom: 22px;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.35);
+  left: 0;
+  bottom: 0;
+  width: 42%;
+  height: 72%;
   pointer-events: auto;
   touch-action: none;
+}
+.joystick {
+  position: absolute;
+  left: calc(86px + env(safe-area-inset-left));
+  top: calc(100% - 96px - env(safe-area-inset-bottom));
+  width: 124px;
+  height: 124px;
+  margin: -62px 0 0 -62px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.14));
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  opacity: 0.55;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+.joystick.active {
+  opacity: 1;
 }
 .joystick .knob {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 60px;
-  height: 60px;
-  margin: -30px 0 0 -30px;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.45);
-  border: 2px solid #fff;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.85), rgba(200, 220, 255, 0.55));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 .m-btn {
   position: absolute;
   pointer-events: auto;
   touch-action: none;
   border-radius: 50%;
-  background: rgba(14, 26, 44, 0.75);
-  border: 2px solid rgba(255, 255, 255, 0.5);
+  background: rgba(14, 26, 44, 0.72);
+  border: 2px solid rgba(255, 255, 255, 0.45);
   font-weight: 700;
-  font-size: 14px;
+  font-size: 22px;
   color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  -webkit-touch-callout: none;
+  backdrop-filter: blur(4px);
 }
 .m-action {
-  right: 24px;
-  bottom: 30px;
-  width: 104px;
-  height: 104px;
-  font-size: 34px;
-  background: radial-gradient(circle at 35% 30%, #5fd0ff, #1d7fd8);
+  right: calc(22px + env(safe-area-inset-right));
+  bottom: calc(26px + env(safe-area-inset-bottom));
+  width: 118px;
+  height: 118px;
+  background: radial-gradient(circle at 35% 30%, #6fd8ff, #1d7fd8 70%);
+  border: 3px solid #fff;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+.m-action .ic {
+  font-size: 40px;
+  line-height: 1;
+}
+.m-action .lb {
+  font-size: 15px;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+.m-action.reeling {
+  background: radial-gradient(circle at 35% 30%, #8affa0, #23b04a 70%);
+  animation: pulse 0.8s infinite;
 }
 .m-action.held {
-  transform: scale(0.94);
+  transform: scale(0.93);
   filter: brightness(1.2);
 }
 .m-jump {
-  right: 140px;
-  bottom: 24px;
-  width: 64px;
-  height: 64px;
+  right: calc(150px + env(safe-area-inset-right));
+  bottom: calc(22px + env(safe-area-inset-bottom));
+  width: 66px;
+  height: 66px;
 }
 .m-interact {
-  right: 140px;
-  bottom: 98px;
-  width: 64px;
-  height: 64px;
+  right: calc(150px + env(safe-area-inset-right));
+  bottom: calc(100px + env(safe-area-inset-bottom));
+  width: 74px;
+  height: 74px;
+  font-size: 30px;
+  background: radial-gradient(circle at 35% 30%, #ffe27a, #e8a01a 70%);
+  border-color: #fff;
+  display: none;
+  animation: shakePop 0.2s ease-out;
+}
+.m-interact.show {
+  display: flex;
 }
 .m-boat {
-  right: 40px;
-  bottom: 148px;
-  width: 64px;
-  height: 64px;
+  right: calc(36px + env(safe-area-inset-right));
+  bottom: calc(160px + env(safe-area-inset-bottom));
+  width: 62px;
+  height: 62px;
+}
+body.touch .hud-tl {
+  top: calc(8px + env(safe-area-inset-top));
+  left: calc(8px + env(safe-area-inset-left));
+}
+body.touch .hud-tr {
+  top: calc(8px + env(safe-area-inset-top));
+  right: calc(8px + env(safe-area-inset-right));
 }
 body.touch .hud-bottom {
   bottom: auto;
-  top: 12px;
+  top: calc(8px + env(safe-area-inset-top));
+  gap: 6px;
+}
+body.touch .hud-bottom .menu-btn {
+  padding: 8px 10px;
+  font-size: 18px;
+  min-width: 42px;
+  justify-content: center;
 }
 body.touch .hud-bottom .menu-btn .label,
 body.touch .hud-bottom .menu-btn .key {
   display: none;
 }
 body.touch .prompt {
-  bottom: 190px;
+  bottom: calc(200px + env(safe-area-inset-bottom));
 }
 body.touch .reel {
-  bottom: 170px;
+  bottom: calc(160px + env(safe-area-inset-bottom));
 }
 body.touch #minimap {
-  width: 110px;
-  height: 110px;
+  width: 104px;
+  height: 104px;
 }
-body.touch .zone-name {
+body.touch .zone-name,
+body.touch .hud-tl .gear {
   display: none;
 }
 body.touch .power {
   left: auto;
-  right: 150px;
+  right: calc(160px + env(safe-area-inset-right));
 }
-
-@media (max-width: 760px) {
-  .level-box {
-    min-width: 140px;
+body.touch .shake-btn {
+  width: 112px;
+  height: 112px;
+  font-size: 20px;
+}
+body.touch .level-box {
+  min-width: 150px;
+  padding: 4px 10px;
+}
+body.touch .cash {
+  font-size: 16px;
+  padding: 4px 12px;
+}
+body.touch .env {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+body.touch .modal {
+  width: 96vw;
+  max-height: 92vh;
+}
+body.touch .btn {
+  min-height: 40px;
+  font-size: 15px;
+}
+body.touch .catch-head .name {
+  font-size: 34px;
+}
+/* Dikey telefon: menü ikinci satıra, bilgiler küçülür */
+@media (orientation: portrait) {
+  body.touch .hud-bottom {
+    top: auto;
+    bottom: calc(160px + env(safe-area-inset-bottom));
+    left: 8px;
+    transform: none;
+    flex-direction: column;
   }
-  .cash {
-    font-size: 16px;
+  body.touch .joy-zone {
+    width: 55%;
+    height: 55%;
+  }
+  body.touch .reel {
+    bottom: calc(190px + env(safe-area-inset-bottom));
+    width: 94vw;
+  }
+  body.touch .hud-tr .env {
+    max-width: 52vw;
   }
   .zone-banner .t {
-    font-size: 30px;
+    font-size: 28px;
   }
-  .catch-head .name {
-    font-size: 32px;
+  body.touch .hint {
+    top: 34%;
+    border-radius: 14px;
   }
-  .hud-tr .env {
-    font-size: 12px;
-  }
-  .hud-bottom {
-    left: 50%;
-  }
-  .hud-tl .gear {
-    display: none;
+  body.touch .toasts {
+    top: 100px;
   }
 }
 
@@ -1060,10 +1159,21 @@ body.touch .power {
   opacity: 0;
   pointer-events: none;
 }
+.start-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
 .start-btn {
-  font-size: 22px;
-  padding: 12px 34px;
+  font-size: 20px;
+  padding: 12px 28px;
   display: none;
+}
+.loading .tip {
+  font-size: 14px;
+  max-width: 80vw;
+  text-align: center;
 }
 
 @keyframes pulse {

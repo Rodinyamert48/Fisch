@@ -30,6 +30,7 @@ uniform float night;
 uniform float aurora;
 uniform float time;
 uniform float cloudCover;
+uniform float linearOut;
 
 float hash3(vec3 p) {
   p = fract(p * 0.3183099 + 0.1);
@@ -100,6 +101,8 @@ void main(void) {
     col = mix(col, cloudColor, cov * smoothstep(0.0, 0.18, h) * 0.9);
   }
 
+  // HDR ton eşleme hattı açıkken doğrusal uzayda çıktı ver
+  if (linearOut > 0.5) col = pow(max(col, vec3(0.0)), vec3(2.2));
   gl_FragColor = vec4(col, 1.0);
 }
 `;
@@ -121,7 +124,7 @@ export class Sky {
   readonly material: ShaderMaterial;
   private time = 0;
 
-  constructor(scene: Scene, radius = 1400) {
+  constructor(scene: Scene, linear = false, radius = 1400) {
     this.mesh = CreateSphere('sky', { diameter: radius * 2, segments: 24, sideOrientation: 1 }, scene);
     this.mesh.infiniteDistance = true;
     this.mesh.isPickable = false;
@@ -133,7 +136,7 @@ export class Sky {
         attributes: ['position'],
         uniforms: [
           'worldViewProjection', 'sunDir', 'moonDir', 'zenithColor', 'horizonColor', 'sunColor', 'cloudColor',
-          'night', 'aurora', 'time', 'cloudCover',
+          'night', 'aurora', 'time', 'cloudCover', 'linearOut',
         ],
       },
     );
@@ -142,6 +145,7 @@ export class Sky {
     this.mesh.material = this.material;
     this.mesh.renderingGroupId = 0;
     this.mesh.applyFog = false;
+    this.material.setFloat('linearOut', linear ? 1 : 0);
   }
 
   update(dt: number, s: SkyState): void {
